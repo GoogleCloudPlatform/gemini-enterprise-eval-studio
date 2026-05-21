@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Enterprise Eval Studio</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <!-- PapaParse CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <!-- Marked.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Lucide Icons (Alternative to Lucide React for simple setup) -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-50 text-gray-900">
+    <app-root>Loading...</app-root>
+
+    <script src="/app_bundle.js"></script>
+    <script>
+        // Initialize Lucide icons after Angular renders (we'll need to call this from Angular or use a mutation observer, or just use inline SVGs as planned. Let's keep it here as fallback).
+        // lucide.createIcons();
+    </script>
+</body>
+</html>

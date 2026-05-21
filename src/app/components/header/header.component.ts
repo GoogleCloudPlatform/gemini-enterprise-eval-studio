@@ -1,5 +1,6 @@
 import {CommonModule} from '@angular/common';
 import {Component} from '@angular/core';
+import {Observable} from 'rxjs';
 import {map} from 'rxjs/operators';
 
 import {StateService} from '../../services/state.service';
@@ -16,10 +17,11 @@ import {StateService} from '../../services/state.service';
 })
 export class HeaderComponent {
   /** Observable of the mapped title string for the current active tab. */
-  tabTitle$ =
-      this.stateService.currentTab$.pipe(map(tab => this.getTabTitle(tab)));
+  tabTitle$: Observable<string>;
 
-  constructor(public stateService: StateService) {}
+  constructor(public stateService: StateService) {
+    this.tabTitle$ = this.stateService.currentTab$.pipe(map(tab => this.getTabTitle(tab)));
+  }
 
   /**
    * Returns the title string for the current active tab.

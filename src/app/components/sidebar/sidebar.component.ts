@@ -1,5 +1,6 @@
 import {CommonModule} from '@angular/common';
 import {Component} from '@angular/core';
+import {Observable} from 'rxjs';
 
 import {StateService} from '../../services/state.service';
 
@@ -14,10 +15,12 @@ import {StateService} from '../../services/state.service';
 })
 export class SidebarComponent {
   /** Observable of the current active tab. */
-  currentTab$ = this.stateService.currentTab$;
+  currentTab$: Observable<string>;
   isCollapsed = false;
 
-  constructor(private stateService: StateService) {}
+  constructor(private stateService: StateService) {
+    this.currentTab$ = this.stateService.currentTab$;
+  }
 
   /** Sets the current active tab. */
   setTab(tab: string) {

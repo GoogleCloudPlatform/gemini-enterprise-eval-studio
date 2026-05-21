@@ -1,0 +1,19 @@
+
+<div class="flex h-screen bg-gray-50 text-gray-900">
+  <!-- Sidebar -->
+  <app-sidebar></app-sidebar>
+
+  <!-- Main Content -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+    <!-- Header -->
+    <app-header></app-header>
+
+    <!-- Content Area -->
+    <main class="flex-1 overflow-auto p-6 bg-gray-50">
+      <app-run-evaluation *ngIf="currentTab === 'run'"></app-run-evaluation>
+      <app-compare-evals *ngIf="currentTab === 'compare'"></app-compare-evals>
+      <app-get-golden *ngIf="currentTab === 'golden'"></app-get-golden>
+      <app-about *ngIf="currentTab === 'about'"></app-about>
+    </main>
+  </div>
+</div>
