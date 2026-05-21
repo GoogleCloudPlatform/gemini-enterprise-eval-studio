@@ -1,0 +1,165 @@
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+  <!-- Engine Selection Card -->
+  <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+    <h3 class="text-lg font-medium mb-4 text-gray-800">Engine Selection</h3>
+    <div class="space-y-4">
+      <div>
+        <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+          ><span>gCloud Access Token</span
+          ><app-info-tooltip
+            class="inline-flex"
+            text="Access token obtained from `gcloud auth print-access-token`. Used to authenticate requests to Discovery Engine API."
+          ></app-info-tooltip
+        ></label>
+        <input
+          [(ngModel)]="config.gCloudToken"
+          (ngModelChange)="onConfigChange()"
+          type="password"
+          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          placeholder="ya29..."
+        />
+      </div>
+      <div>
+        <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+          ><span>Project ID</span
+          ><app-info-tooltip
+            class="inline-flex"
+            text="The Google Cloud Project ID where your Discovery Engine is located."
+          ></app-info-tooltip
+        ></label>
+        <input
+          [(ngModel)]="config.projectId"
+          (ngModelChange)="onConfigChange()"
+          type="text"
+          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          placeholder="my-project-id"
+        />
+      </div>
+      <div>
+        <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+          ><span>Region</span
+          ><app-info-tooltip
+            class="inline-flex"
+            text="The region where your Discovery Engine is located (e.g., global, us, eu)."
+          ></app-info-tooltip
+        ></label>
+        <select
+          [(ngModel)]="config.region"
+          (ngModelChange)="onConfigChange()"
+          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+        >
+          <option value="global">global</option>
+          <option value="us">us</option>
+          <option value="eu">eu</option>
+        </select>
+      </div>
+      <button
+        (click)="fetchEngines()"
+        [disabled]="loading"
+        class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white p-2 rounded-md hover:from-blue-700 hover:to-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Fetch Engines
+      </button>
+
+      <!-- Loading Indicator -->
+      <div *ngIf="loading" class="flex items-center justify-center space-x-2 text-sm text-gray-500">
+        <div
+          class="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"
+        ></div>
+        <span>Fetching engines...</span>
+      </div>
+
+      <!-- Error Message -->
+      <div *ngIf="errorMessage" class="p-2 text-sm text-red-700 bg-red-100 rounded-md">
+        {{ errorMessage }}
+      </div>
+
+      <!-- Engine and Model Selection -->
+      <div *ngIf="engines.length > 0" class="space-y-4">
+        <div>
+          <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+            ><span>Engine</span
+            ><app-info-tooltip
+              class="inline-flex"
+              text="The specific search engine or app to evaluate."
+            ></app-info-tooltip
+          ></label>
+          <select
+            [(ngModel)]="config.selectedEngine"
+            (change)="onEngineChange()"
+            class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option *ngFor="let e of engines" [value]="e.name">{{ e.displayName }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+            ><span>Model</span
+            ><app-info-tooltip
+              class="inline-flex"
+              text="The generation model to use for evaluation."
+            ></app-info-tooltip
+          ></label>
+          <select
+            [(ngModel)]="config.selectedModel"
+            (ngModelChange)="onConfigChange()"
+            class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            [disabled]="!config.selectedEngine"
+          >
+            <option *ngFor="let m of models" [value]="m">{{ m }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Auto Rater Setup Card -->
+  <div *ngIf="!isGetGolden" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+    <h3 class="text-lg font-medium mb-4 text-gray-800">Auto Rater Setup</h3>
+    <div class="space-y-4">
+      <div>
+        <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+          ><span>Gemini API Key</span
+          ><app-info-tooltip
+            class="inline-flex"
+            text="API key for Gemini models, used by the auto-rater."
+          ></app-info-tooltip
+        ></label>
+        <input
+          [(ngModel)]="config.geminiApiKey"
+          (ngModelChange)="onConfigChange()"
+          type="password"
+          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          placeholder="AIzaSy..."
+        />
+      </div>
+      <div>
+        <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+          ><span>Auto Rater Instruction</span
+          ><app-info-tooltip
+            class="inline-flex"
+            text="Instructions for the Gemini model acting as an auto-rater."
+          ></app-info-tooltip
+        ></label>
+        <textarea
+          [(ngModel)]="config.autoRaterInstruction"
+          (ngModelChange)="onConfigChange()"
+          rows="6"
+          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+          placeholder="Enter evaluation instructions..."
+        ></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Next Button -->
+  <div class="md:col-span-2 flex justify-end">
+    <button
+      (click)="onNext()"
+      [disabled]="!canProceed()"
+      class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+    >
+      Next
+    </button>
+  </div>
+</div>

@@ -1,0 +1,110 @@
+<div class="bg-white shadow-sm border border-gray-200 rounded-lg overflow-hidden mt-6">
+  <div *ngIf="title || data.length > 0" class="px-4 py-5 sm:px-6 flex justify-between items-center">
+    <h3 *ngIf="title" class="text-lg font-medium leading-6 text-gray-900">{{ title }}</h3>
+    <div *ngIf="!title"></div>
+    <!-- Spacer -->
+    <button
+      (click)="exportResults()"
+      [disabled]="data.length === 0"
+      class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-300 transition-colors font-medium"
+    >
+      Export CSV
+    </button>
+  </div>
+  <div class="border-t border-gray-200 overflow-x-auto">
+    <table class="min-w-full divide-y divide-gray-200">
+      <thead class="bg-gray-50">
+        <tr>
+          <th
+            *ngFor="let col of columns"
+            class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+          >
+            {{ col.header }}
+          </th>
+        </tr>
+      </thead>
+      <tbody class="bg-white divide-y divide-gray-200">
+        <tr *ngFor="let row of data; let i = index" class="hover:bg-gray-50 transition-colors">
+          <td *ngFor="let col of columns" class="px-6 py-4 text-sm text-gray-500">
+            <!-- Text Type -->
+            <div
+              *ngIf="!col.type || col.type === 'text'"
+              [ngClass]="{ 'text-gray-900': col.key === 'query' }"
+            >
+              {{ col.truncate && !isExpanded(i, col.key) ? truncate(row[col.key]) : row[col.key] }}
+              <button
+                *ngIf="col.truncate && row[col.key]?.length > 100"
+                (click)="toggleExpand(i, col.key)"
+                class="inline-flex items-center px-1.5 py-0.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-1 mt-1"
+              >
+                {{ isExpanded(i, col.key) ? "Show less" : "Show more" }}
+              </button>
+            </div>
+
+            <!-- Markdown Type -->
+            <div *ngIf="col.type === 'markdown'" class="prose prose-sm">
+              <div
+                [innerHTML]="
+                  renderMarkdown(
+                    col.truncate && !isExpanded(i, col.key) ? truncate(row[col.key]) : row[col.key]
+                  ) | safeHtml
+                "
+              ></div>
+              <button
+                *ngIf="col.truncate && row[col.key]?.length > 100"
+                (click)="toggleExpand(i, col.key)"
+                class="inline-flex items-center px-1.5 py-0.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ml-1 mt-1"
+              >
+                {{ isExpanded(i, col.key) ? "Show less" : "Show more" }}
+              </button>
+            </div>
+
+            <!-- Number Type -->
+            <div *ngIf="col.type === 'number'">
+              {{ row[col.key] }}
+            </div>
+
+            <!-- Score Type -->
+            <div *ngIf="col.type === 'score'" class="font-medium">
+              <span
+                [ngClass]="{
+                  'text-green-600': row[col.key] >= 0.8,
+                  'text-yellow-600': row[col.key] >= 0.5 && row[col.key] < 0.8,
+                  'text-red-600': row[col.key] < 0.5,
+                }"
+              >
+                {{ row[col.key] }}
+              </span>
+            </div>
+
+            <!-- Delta Type -->
+            <div *ngIf="col.type === 'delta'" class="font-medium">
+              <span
+                [ngClass]="{
+                  'text-green-600': row[col.key] > 0.1,
+                  'text-red-600': row[col.key] < -0.1,
+                  'text-gray-600': row[col.key] >= -0.1 && row[col.key] <= 0.1,
+                }"
+              >
+                {{ row[col.key] > 0 ? "+" : "" }}{{ row[col.key] }}
+              </span>
+              <span
+                *ngIf="row[col.key] > 0.1"
+                class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                >Improvement</span
+              >
+              <span
+                *ngIf="row[col.key] < -0.1"
+                class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
+                >Regression</span
+              >
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="px-4 py-3 bg-gray-50 text-right sm:px-6">
+    <ng-content select="[footer]"></ng-content>
+  </div>
+</div>
