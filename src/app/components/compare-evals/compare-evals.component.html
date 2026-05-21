@@ -1,0 +1,73 @@
+<div class="space-y-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Baseline Upload -->
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-lg font-medium mb-4 text-gray-800">Upload Baseline CSV</h3>
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                 [class.border-blue-500]="isDraggingBaseline"
+                 [class.bg-blue-50]="isDraggingBaseline"
+                 (dragover)="onDragOverBaseline($event)"
+                 (dragleave)="onDragLeaveBaseline($event)"
+                 (drop)="onDropBaseline($event)"
+                 (click)="baselineInput.click()"
+                 (keydown.enter)="baselineInput.click()"
+                 (keydown.space)="baselineInput.click(); $event.preventDefault()"
+                 tabindex="0"
+                 role="button"
+                 aria-label="Upload Baseline CSV file">
+                <input #baselineInput type="file" class="hidden" (change)="onBaselineSelected($event)" accept=".csv">
+                <div class="space-y-2">
+                    <svg class="w-10 h-10 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <div class="text-sm text-gray-600">
+                        <span class="font-medium text-blue-600">Click to upload</span> or drag
+                    </div>
+                    <p class="text-xs text-amber-600 mt-1">Limited to 100 rows. If exceeded, only first 100 rows considered.</p>
+                </div>
+            </div>
+            <div *ngIf="baselineFile" class="mt-2 text-sm text-green-600 flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>{{baselineFile.name}} ({{baselineRows.length}} rows)</span>
+            </div>
+        </div>
+
+        <!-- Recent Upload -->
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h3 class="text-lg font-medium mb-4 text-gray-800">Upload Recent CSV</h3>
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-500 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                 [class.border-blue-500]="isDraggingRecent"
+                 [class.bg-blue-50]="isDraggingRecent"
+                 (dragover)="onDragOverRecent($event)"
+                 (dragleave)="onDragLeaveRecent($event)"
+                 (drop)="onDropRecent($event)"
+                 (click)="recentInput.click()"
+                 (keydown.enter)="recentInput.click()"
+                 (keydown.space)="recentInput.click(); $event.preventDefault()"
+                 tabindex="0"
+                 role="button"
+                 aria-label="Upload Recent CSV file">
+                <input #recentInput type="file" class="hidden" (change)="onRecentSelected($event)" accept=".csv">
+                <div class="space-y-2">
+                    <svg class="w-10 h-10 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <div class="text-sm text-gray-600">
+                        <span class="font-medium text-blue-600">Click to upload</span> or drag
+                    </div>
+                    <p class="text-xs text-amber-600 mt-1">Limited to 100 rows. If exceeded, only first 100 rows considered.</p>
+                </div>
+            </div>
+            <div *ngIf="recentFile" class="mt-2 text-sm text-green-600 flex items-center space-x-1">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>{{recentFile.name}} ({{recentRows.length}} rows)</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compare Button -->
+    <div class="flex justify-center">
+        <button (click)="compareEvals()" [disabled]="!baselineFile || !recentFile" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-300 transition-colors font-medium">
+            Compare
+        </button>
+    </div>
+
+    <!-- Comparison Results Table -->
+    <app-csv-table *ngIf="comparisonResults.length > 0" [data]="comparisonResults" [columns]="columns" [title]="'Comparison Results'" [exportFileName]="'compare_results'"></app-csv-table>
+</div>

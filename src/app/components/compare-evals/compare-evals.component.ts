@@ -1,0 +1,162 @@
+import {CommonModule} from '@angular/common';
+import {ChangeDetectorRef, Component} from '@angular/core';
+import {FormsModule} from '@angular/forms';
+
+import {ComparisonResult} from '../../models/comparison-result.model';
+import {CsvService} from '../../services/csv.service';
+import {CsvTableComponent, ColumnDef} from '../shared/csv-table/csv-table.component';
+
+@Component({
+  selector: 'app-compare-evals',
+  standalone: true,
+  imports: [CommonModule, FormsModule, CsvTableComponent],
+  templateUrl: './compare-evals.component.html'
+})
+/**
+ * Component for comparing two evaluation results.
+ */
+export class CompareEvalsComponent {
+  baselineFile: File|null = null;
+  baselineRows: Array<Record<string, string>> = [];
+  recentFile: File|null = null;
+  recentRows: Array<Record<string, string>> = [];
+  comparisonResults: ComparisonResult[] = [];
+  isDraggingBaseline = false;
+  isDraggingRecent = false;
+
+  columns: ColumnDef[] = [
+    {header: 'Query', key: 'query', truncate: true},
+    {header: 'Baseline Score', key: 'baselineScore', type: 'number'},
+    {header: 'Recent Score', key: 'recentScore', type: 'number'},
+    {header: 'Delta', key: 'delta', type: 'delta'}
+  ];
+
+  constructor(private csvService: CsvService, private cdr: ChangeDetectorRef) {}
+
+  /** Prevents default drag behavior to allow drop. */
+  onDragOver(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  /** Handles dragover for baseline dropzone. */
+  onDragOverBaseline(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDraggingBaseline = true;
+  }
+
+  /** Handles dragleave for baseline dropzone. */
+  onDragLeaveBaseline(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDraggingBaseline = false;
+  }
+
+  /** Handles dragover for recent dropzone. */
+  onDragOverRecent(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDraggingRecent = true;
+  }
+
+  /** Handles dragleave for recent dropzone. */
+  onDragLeaveRecent(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDraggingRecent = false;
+  }
+
+  /** Handles the drop event for the baseline file. */
+  onDropBaseline(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDraggingBaseline = false;
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.handleFileSelection(files[0], 'baseline');
+    }
+  }
+
+  /** Handles the file selection event for the baseline file. */
+  onBaselineSelected(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const files = target.files;
+    if (files && files.length > 0) {
+      this.handleFileSelection(files[0], 'baseline');
+    }
+  }
+
+  /** Handles the drop event for the recent file. */
+  onDropRecent(event: DragEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDraggingRecent = false;
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.handleFileSelection(files[0], 'recent');
+    }
+  }
+
+  /** Handles the file selection event for the recent file. */
+  onRecentSelected(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const files = target.files;
+    if (files && files.length > 0) {
+      this.handleFileSelection(files[0], 'recent');
+    }
+  }
+
+  /** Core logic to parse and store selected files. */
+  private handleFileSelection(file: File, type: 'baseline'|'recent') {
+    if (type === 'baseline') {
+      this.baselineFile = file;
+    } else {
+      this.recentFile = file;
+    }
+
+    this.csvService.parseCSV(file, (data) => {
+      const normalizedData = this.normalizeRows(data);
+      if (type === 'baseline') {
+        this.baselineRows = normalizedData;
+      } else {
+        this.recentRows = normalizedData;
+      }
+      this.cdr.detectChanges();
+    }, (err) => console.error(err));
+  }
+
+  /**
+   * Normalizes CSV headers to lowercase to prevent case-sensitive header
+   * issues.
+   */
+  private normalizeRows(rows: Array<Record<string, string>>):
+      Array<Record<string, string>> {
+    return rows.map((row) => {
+      const normalizedRow: Record<string, string> = {};
+      for (const [key, value] of Object.entries(row)) {
+        const normalizedKey = key.trim().replace(/^\ufeff/, '').toLowerCase();
+        normalizedRow[normalizedKey] = value;
+      }
+      return normalizedRow;
+    });
+  }
+
+  /** Compares baseline and recent evaluations. */
+  compareEvals() {
+    this.comparisonResults = [];
+    const recentMap = new Map(this.recentRows.map(r => [r['query'], r]));
+
+    this.baselineRows.forEach(baseRow => {
+      const recentRow = recentMap.get(baseRow['query']);
+      if (recentRow) {
+        const baselineScore = Number(baseRow['score']) || 0;
+        const recentScore = Number(recentRow['score']) || 0;
+        const delta = Number((recentScore - baselineScore).toFixed(2));
+        this.comparisonResults.push(
+            {query: baseRow['query'], baselineScore, recentScore, delta});
+      }
+    });
+    this.cdr.detectChanges();
+  }
+}
