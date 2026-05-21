@@ -1,0 +1,68 @@
+<div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 max-w-4xl mx-auto">
+  <div class="prose max-w-none">
+    <h1 class="text-3xl font-bold mb-6 text-gray-950">Gemini Enterprise Eval Studio</h1>
+
+    <h2 class="text-xl font-semibold mt-6 mb-3 text-gray-900">Overview</h2>
+    <p class="text-gray-700 mb-4 leading-relaxed">
+      Gemini Enterprise Eval Studio is a specialized tool for cloud engineers and AI practitioners to rigorously test, evaluate, and compare responses from Google Cloud Discovery Engine (Vertex AI Search & Conversation). It leverages Gemini as an automated rater to provide objective semantic similarity scores and user defined rubrics along with the latency metrics.
+    </p>
+
+    <h2 class="text-xl font-semibold mt-6 mb-3 text-gray-900">Getting Started</h2>
+
+    <h3 class="text-lg font-medium mt-4 mb-2 text-gray-800">1. Prerequisites</h3>
+    <ul class="list-disc pl-5 mb-4 text-gray-700 space-y-2">
+      <li>
+        <strong>Google Cloud Access Token</strong>: You can get this by running <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-200">gcloud auth print-access-token</code> in your terminal. Note: tokens expire, so you may need to refresh them.
+      </li>
+      <li>
+        <strong>Gemini API Key</strong>: Obtain a key from the Google AI Studio.
+      </li>
+      <li>
+        <strong>Discovery Engine Setup</strong>: Ensure you have engines configured in your Vertex AI Search project.
+      </li>
+    </ul>
+
+    <h3 class="text-lg font-medium mt-4 mb-2 text-gray-800">2. CSV Formats</h3>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+      <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+        <h4 class="text-base font-semibold mb-2 text-gray-800">For Run Evaluation</h4>
+        <p class="text-gray-700 mb-2 text-sm">Your CSV must contain at least these two columns:</p>
+        <ul class="list-disc pl-5 text-gray-700 text-sm space-y-1">
+          <li><code class="bg-white px-1.5 py-0.5 rounded text-xs font-mono border border-gray-200">query</code>: The search or conversation prompt.</li>
+          <li><code class="bg-white px-1.5 py-0.5 rounded text-xs font-mono border border-gray-200">golden</code>: The expected ideal response (baseline).</li>
+        </ul>
+      </div>
+
+      <div class="border border-gray-200 rounded-md p-4 bg-gray-50">
+        <h4 class="text-base font-semibold mb-2 text-gray-800">For Get Golden</h4>
+        <p class="text-gray-700 mb-2 text-sm">Your CSV only needs:</p>
+        <ul class="list-disc pl-5 text-gray-700 text-sm space-y-1">
+          <li><code class="bg-white px-1.5 py-0.5 rounded text-xs font-mono border border-gray-200">query</code>: The search or conversation prompt.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 class="text-lg font-medium mt-4 mb-2 text-gray-800">3. Metric Definitions</h3>
+    <ul class="list-disc pl-5 mb-4 text-gray-700 space-y-2">
+      <li><strong>TTFT (Time to First Token)</strong>: Latency until the first chunk of data (text or thought) is received from the model.</li>
+      <li><strong>TFUFT (Time to First User Facing Token)</strong>: Latency until the first actual text response (excluding internal chain-of-thought) is received.</li>
+      <li><strong>Latency</strong>: Total time taken for the entire response to stream.</li>
+      <li><strong>Score</strong>: A semantic similarity score (0.0 to 1.0) calculated by Gemini comparing the fetched response to your golden response.</li>
+    </ul>
+
+    <h3 class="text-lg font-medium mt-4 mb-2 text-gray-800">4. Interpretation of Results</h3>
+    <ul class="list-disc pl-5 mb-4 text-gray-700 space-y-2">
+      <li><strong>Delta (Δ)</strong>: Calculated as Recent Score - Baseline Score.</li>
+      <li><strong class="text-green-600">Improvement (Green)</strong>: Delta &gt; +0.10.</li>
+      <li><strong class="text-red-600">Regression (Red)</strong>: Delta &lt; -0.10.</li>
+      <li><strong class="text-gray-500">Stable (Gray)</strong>: Changes within +/- 0.10 range.</li>
+    </ul>
+
+    <h2 class="text-xl font-semibold mt-6 mb-3 text-gray-900">Security Note</h2>
+    <p class="text-gray-700 mb-4 leading-relaxed">
+      All sensitive tokens and keys are stored only in your browser's local storage for your convenience. They are never sent to any server other than directly to Google's official APIs during execution.
+    </p>
+  </div>
+</div>
+
