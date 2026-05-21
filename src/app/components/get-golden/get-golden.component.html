@@ -1,0 +1,53 @@
+<div class="space-y-6">
+  <!-- Wizard Steps -->
+  <div class="flex items-center justify-center space-x-4 mb-6">
+    <div [ngClass]="{ 'text-blue-600 font-semibold': step === 1, 'text-gray-500': step !== 1 }">
+      1. Configuration
+    </div>
+    <div class="text-gray-300">/</div>
+    <div [ngClass]="{ 'text-blue-600 font-semibold': step === 2, 'text-gray-500': step !== 2 }">
+      2. Upload & Run
+    </div>
+    <div class="text-gray-300">/</div>
+    <div [ngClass]="{ 'text-blue-600 font-semibold': step === 3, 'text-gray-500': step !== 3 }">
+      3. Results
+    </div>
+  </div>
+
+  <!-- Configuration Form -->
+  <app-config-form *ngIf="step === 1" [isGetGolden]="true" (next)="nextStep()"></app-config-form>
+
+  <!-- File Upload -->
+  <app-file-upload
+    *ngIf="step === 2"
+    (prev)="prevStep()"
+    (run)="startGoldenGeneration($event)"
+    [instruction]="'CSV file with at least \'query\' column'"
+    [buttonText]="'Generate Golden Responses'"
+    [requiredColumns]="['query']"
+  ></app-file-upload>
+
+  <!-- Progress Bar -->
+  <app-progress-bar
+    *ngIf="isProcessingGolden"
+    [progress]="goldenProgress"
+    [text]="'Generating responses... (' + completedRows + ' / ' + totalRows + ')'"
+  ></app-progress-bar>
+
+  <!-- Results Table -->
+  <app-csv-table
+    *ngIf="step === 3 && goldenResults.length > 0"
+    [data]="goldenResults"
+    [columns]="columns"
+    [title]="'Golden Dataset'"
+    [exportFileName]="'golden_dataset'"
+  >
+    <button
+      footer
+      (click)="prevStep()"
+      class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
+    >
+      Back to Upload
+    </button>
+  </app-csv-table>
+</div>

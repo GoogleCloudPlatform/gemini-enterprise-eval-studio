@@ -1,0 +1,53 @@
+<div class="space-y-6">
+  <!-- Wizard Steps -->
+  <div class="flex items-center justify-center space-x-4 mb-6">
+    <div [ngClass]="{ 'text-blue-600 font-semibold': step === 1, 'text-gray-500': step !== 1 }">
+      1. Configuration
+    </div>
+    <div class="text-gray-300">/</div>
+    <div [ngClass]="{ 'text-blue-600 font-semibold': step === 2, 'text-gray-500': step !== 2 }">
+      2. Upload & Run
+    </div>
+    <div class="text-gray-300">/</div>
+    <div [ngClass]="{ 'text-blue-600 font-semibold': step === 3, 'text-gray-500': step !== 3 }">
+      3. Results
+    </div>
+  </div>
+
+  <!-- Configuration Form -->
+  <app-config-form *ngIf="step === 1" (next)="nextStep()"></app-config-form>
+
+  <!-- File Upload -->
+  <app-file-upload
+    *ngIf="step === 2"
+    (prev)="prevStep()"
+    (run)="startEvaluation($event)"
+    [instruction]="'CSV file with at least \'query\' and \'golden\' columns'"
+    [buttonText]="'Run Evaluation'"
+    [requiredColumns]="['query', 'golden']"
+  ></app-file-upload>
+
+  <!-- Results Table -->
+  <app-csv-table
+    *ngIf="step === 3"
+    [data]="results"
+    [columns]="columns"
+    [title]="'Evaluation Results'"
+    [exportFileName]="'eval_results'"
+  >
+    <button
+      footer
+      (click)="prevStep()"
+      class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
+    >
+      Back to Upload
+    </button>
+  </app-csv-table>
+
+  <!-- Progress Bar -->
+  <app-progress-bar
+    *ngIf="isProcessing"
+    [progress]="progress"
+    [text]="'Evaluating... (' + completedRows + ' / ' + totalRows + ')'"
+  ></app-progress-bar>
+</div>
