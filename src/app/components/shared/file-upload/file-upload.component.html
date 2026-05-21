@@ -1,0 +1,52 @@
+<div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 max-w-2xl mx-auto">
+  <h3 class="text-lg font-medium mb-4 text-gray-800">Upload Evaluation Dataset</h3>
+
+  <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-500 transition-colors cursor-pointer"
+       (dragover)="onDragOver($event)" (drop)="onDrop($event)" (click)="fileInput.click()">
+    <input #fileInput type="file" class="hidden" (change)="onFileSelected($event)" accept=".csv">
+    <div class="space-y-2">
+      <svg class="w-12 h-12 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+      </svg>
+      <div class="text-sm text-gray-600">
+        <span class="font-medium text-blue-600 hover:text-blue-500">Click to upload</span> or drag and drop
+      </div>
+      <p class="text-xs text-gray-500">{{ instruction }}</p>
+      <p class="text-xs text-amber-600 mt-1">Limited to 100 rows. If exceeded, only the first 100 rows will be considered.</p>
+    </div>
+  </div>
+
+  <!-- File Info -->
+  <div *ngIf="file" class="mt-4 p-4 bg-green-50 rounded-md flex items-center justify-between">
+    <div>
+      <p class="text-sm font-medium text-green-800">{{file.name}}</p>
+      <p class="text-xs text-green-600" *ngIf="!isParsing">{{csvRows.length}} rows found</p>
+      <p class="text-xs text-blue-600" *ngIf="isParsing">Parsing file...</p>
+    </div>
+    <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20" *ngIf="!isParsing">
+      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+    </svg>
+    <svg class="animate-spin h-5 w-5 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" *ngIf="isParsing">
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="uploadError" class="mt-4 p-4 bg-red-50 rounded-md flex items-center space-x-2">
+    <svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+      <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+    </svg>
+    <p class="text-sm text-red-800">{{uploadError}}</p>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="flex justify-between mt-6">
+    <button (click)="onPrev()" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium">
+      Back
+    </button>
+    <button (click)="onRun()" [disabled]="!file || !!uploadError || isParsing" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-300 transition-colors font-medium">
+      {{ buttonText }}
+    </button>
+  </div>
+</div>
