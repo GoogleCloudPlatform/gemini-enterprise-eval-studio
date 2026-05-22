@@ -2,7 +2,6 @@ import {CommonModule} from '@angular/common';
 import {Component, Input} from '@angular/core';
 
 import {CsvService} from '../../../services/csv.service';
-import {SafeHtmlPipe} from '../../../pipes/safe-html.pipe';
 
 declare var marked: any;
 
@@ -19,7 +18,7 @@ export interface ColumnDef {
 @Component({
   selector: 'app-csv-table',
   standalone: true,
-  imports: [CommonModule, SafeHtmlPipe],
+  imports: [CommonModule],
   templateUrl: './csv-table.component.html'
 })
 /**

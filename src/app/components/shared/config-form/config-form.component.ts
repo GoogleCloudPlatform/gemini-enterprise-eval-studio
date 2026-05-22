@@ -129,7 +129,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
         this.engines.find(e => e.name === this.config.selectedEngine);
     if (selected) {
       // TODO b/514218151 - Fix hardcoded default models
-      const defaultModels = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+      const defaultModels = ['gemini-2.5-pro', 'gemini-3.5-flash'];
       this.models = [...defaultModels];
 
       if (selected.modelConfigs) {

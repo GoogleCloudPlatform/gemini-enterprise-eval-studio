@@ -135,7 +135,7 @@ export class EvalService {
       const latency = Date.now() - startTime;
 
       let score = 0;
-      if (config.geminiApiKey) {
+      if (config.geminiApiKey && row.golden) {
         onProgress?.('score');
         score =
             await this.scoreResponse(row.query, fullText, row.golden, config);

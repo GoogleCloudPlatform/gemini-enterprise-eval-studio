@@ -47,7 +47,7 @@
                 [innerHTML]="
                   renderMarkdown(
                     col.truncate && !isExpanded(i, col.key) ? truncate(row[col.key]) : row[col.key]
-                  ) | safeHtml
+                  )
                 "
               ></div>
               <button
