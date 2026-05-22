@@ -35,7 +35,7 @@ export class HeaderComponent {
       case 'golden':
         return 'Get Golden';
       case 'about':
-        return 'About';
+        return 'About Eval Studio';
       default:
         return 'Eval Studio';
     }

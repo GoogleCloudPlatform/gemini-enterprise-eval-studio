@@ -9,7 +9,7 @@
     <app-header></app-header>
 
     <!-- Content Area -->
-    <main class="flex-1 overflow-auto p-6 bg-gray-50">
+    <main class="flex-1 overflow-auto p-6 bg-gray-50" tabindex="0" aria-label="Main content">
       <app-run-evaluation *ngIf="currentTab === 'run'"></app-run-evaluation>
       <app-compare-evals *ngIf="currentTab === 'compare'"></app-compare-evals>
       <app-get-golden *ngIf="currentTab === 'golden'"></app-get-golden>
