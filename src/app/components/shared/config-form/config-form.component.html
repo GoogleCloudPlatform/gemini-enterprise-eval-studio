@@ -12,6 +12,7 @@
           ></app-info-tooltip
         ></label>
         <input
+          aria-label="gCloud Access Token"
           [(ngModel)]="config.gCloudToken"
           (ngModelChange)="onConfigChange()"
           type="password"
@@ -20,7 +21,7 @@
         />
       </div>
       <div>
-        <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+        <label for="projectId" class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
           ><span>Project ID</span
           ><app-info-tooltip
             class="inline-flex"
@@ -28,6 +29,7 @@
           ></app-info-tooltip
         ></label>
         <input
+          id="projectId"
           [(ngModel)]="config.projectId"
           (ngModelChange)="onConfigChange()"
           type="text"
@@ -44,6 +46,7 @@
           ></app-info-tooltip
         ></label>
         <select
+          aria-label="Region"
           [(ngModel)]="config.region"
           (ngModelChange)="onConfigChange()"
           class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
@@ -85,6 +88,7 @@
             ></app-info-tooltip
           ></label>
           <select
+            aria-label="Engine"
             [(ngModel)]="config.selectedEngine"
             (change)="onEngineChange()"
             class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
@@ -101,6 +105,7 @@
             ></app-info-tooltip
           ></label>
           <select
+            aria-label="Model"
             [(ngModel)]="config.selectedModel"
             (ngModelChange)="onConfigChange()"
             class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
@@ -172,6 +177,7 @@
           ></app-info-tooltip
         ></label>
         <input
+          aria-label="Gemini API Key"
           [(ngModel)]="config.geminiApiKey"
           (ngModelChange)="onConfigChange()"
           type="password"
@@ -188,6 +194,7 @@
           ></app-info-tooltip
         ></label>
         <textarea
+          aria-label="Auto Rater Instruction"
           [(ngModel)]="config.autoRaterInstruction"
           (ngModelChange)="onConfigChange()"
           rows="6"
