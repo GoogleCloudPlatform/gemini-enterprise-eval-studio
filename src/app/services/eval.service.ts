@@ -29,11 +29,30 @@ export class EvalService {
     const url = `https://${baseUrl}/v1/${
         config.selectedEngine}/assistants/default_assistant:streamAssist`;
 
-    const body = {
-      query: {text: row.query},
-      toolsSpec: {vertexAiSearchSpec: {}},
-      generationSpec: {modelId: config.selectedModel}
-    };
+    const body: any = {query: {text: row.query}};
+
+    if (config.selectedModel !== 'auto') {
+      body.generationSpec = {modelId: config.selectedModel};
+    }
+
+    body.toolsSpec = {};
+
+    if (config.selectedDataStores && config.selectedDataStores.length > 0) {
+      body.toolsSpec.vertexAiSearchSpec = {
+        dataStoreSpecs: config.selectedDataStores.map(
+            ds => ({
+              dataStore: `projects/${config.projectId}/locations/${
+                  config.region}/collections/default_collection/dataStores/${
+                  ds}`
+            }))
+      };
+    } else if (!config.enableWebSearch) {
+      body.toolsSpec.vertexAiSearchSpec = {};
+    }
+
+    if (config.enableWebSearch) {
+      body.toolsSpec.webGroundingSpec = {};
+    }
 
     const startTime = Date.now();
     let ttft = 0;

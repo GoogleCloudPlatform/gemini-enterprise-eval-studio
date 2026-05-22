@@ -24,7 +24,9 @@ export class StateService {
       selectedModel: '',
       geminiApiKey: '',
       autoRaterInstruction:
-          'You are an expert evaluator. Compare the fetched response to the golden response for the given query. Calculate a semantic similarity score between 0.0 and 1.0...'
+          'You are an expert evaluator. Compare the fetched response to the golden response for the given query. Calculate a semantic similarity score between 0.0 and 1.0...',
+      selectedDataStores: [],
+      enableWebSearch: false
     };
 
     if (typeof localStorage !== 'undefined') {

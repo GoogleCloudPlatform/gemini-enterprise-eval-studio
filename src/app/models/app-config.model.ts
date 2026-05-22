@@ -9,6 +9,8 @@ export interface AppConfig {
   selectedModel: string;
   geminiApiKey: string;
   autoRaterInstruction: string;
+  selectedDataStores: string[];
+  enableWebSearch: boolean;
 }
 
 /**
@@ -18,4 +20,5 @@ export interface Engine {
   name: string;
   displayName: string;
   modelConfigs?: {[key: string]: string};
+  dataStoreIds?: string[];
 }

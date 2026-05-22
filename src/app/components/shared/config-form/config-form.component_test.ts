@@ -20,7 +20,9 @@ describe('ConfigFormComponent', () => {
       selectedEngine: '',
       selectedModel: '',
       geminiApiKey: '',
-      autoRaterInstruction: ''
+      autoRaterInstruction: '',
+      selectedDataStores: [],
+      enableWebSearch: false
     });
 
     mockStateService = jasmine.createSpyObj(
@@ -180,11 +182,12 @@ describe('ConfigFormComponent', () => {
 
          component.onEngineChange();
 
+         expect(component.models).toContain('auto');
          expect(component.models).toContain('gemini-2.5-pro');
-         expect(component.models).toContain('gemini-2.5-flash');
+         expect(component.models).toContain('gemini-3.5-flash');
          expect(component.models).toContain('custom-model');
          expect(component.models).not.toContain('disabled-model');
-         expect(component.config.selectedModel).toBe('gemini-2.5-pro');
+         expect(component.config.selectedModel).toBe('auto');
        });
   });
 
@@ -200,7 +203,9 @@ describe('ConfigFormComponent', () => {
         selectedEngine: '',
         selectedModel: '',
         geminiApiKey: '',
-        autoRaterInstruction: ''
+        autoRaterInstruction: '',
+        selectedDataStores: [],
+        enableWebSearch: false
       };
 
       expect(component.canProceed()).toBeFalsy();
@@ -219,7 +224,9 @@ describe('ConfigFormComponent', () => {
            selectedEngine: 'engine',
            selectedModel: 'model',
            geminiApiKey: '',
-           autoRaterInstruction: ''
+           autoRaterInstruction: '',
+           selectedDataStores: [],
+           enableWebSearch: false
          };
 
          expect(component.canProceed()).toBeTruthy();
@@ -238,7 +245,9 @@ describe('ConfigFormComponent', () => {
            selectedEngine: 'engine',
            selectedModel: 'model',
            geminiApiKey: '',
-           autoRaterInstruction: ''
+           autoRaterInstruction: '',
+           selectedDataStores: [],
+           enableWebSearch: false
          };
 
          expect(component.canProceed()).toBeFalsy();
@@ -257,7 +266,9 @@ describe('ConfigFormComponent', () => {
            selectedEngine: 'engine',
            selectedModel: 'model',
            geminiApiKey: 'api-key',
-           autoRaterInstruction: ''
+           autoRaterInstruction: '',
+           selectedDataStores: [],
+           enableWebSearch: false
          };
 
          expect(component.canProceed()).toBeTruthy();

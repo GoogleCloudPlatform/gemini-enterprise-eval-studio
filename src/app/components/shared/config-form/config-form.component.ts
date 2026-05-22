@@ -34,7 +34,9 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     selectedEngine: '',
     selectedModel: '',
     geminiApiKey: '',
-    autoRaterInstruction: ''
+    autoRaterInstruction: '',
+    selectedDataStores: [],
+    enableWebSearch: false
   };
 
   engines: Engine[] = [];
@@ -88,7 +90,8 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
                   data.engines.map((e: Engine) => ({
                                      name: e.name,
                                      displayName: e.displayName || e.name,
-                                     modelConfigs: e.modelConfigs
+                                     modelConfigs: e.modelConfigs,
+                                     dataStoreIds: e.dataStoreIds
                                    }));
 
               if (this.config.selectedEngine) {
@@ -129,7 +132,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
         this.engines.find(e => e.name === this.config.selectedEngine);
     if (selected) {
       // TODO b/514218151 - Fix hardcoded default models
-      const defaultModels = ['gemini-2.5-pro', 'gemini-3.5-flash'];
+      const defaultModels = ['auto', 'gemini-2.5-pro', 'gemini-3.5-flash'];
       this.models = [...defaultModels];
 
       if (selected.modelConfigs) {
@@ -140,6 +143,44 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
         }
       }
       this.config.selectedModel = this.models[0] || '';
+    }
+    this.onConfigChange();
+  }
+
+  /**
+   * Gets the currently selected engine.
+   */
+  getSelectedEngine(): Engine|undefined {
+    return this.engines.find(e => e.name === this.config.selectedEngine);
+  }
+
+  /**
+   * Checks if a data store is selected.
+   */
+  isSelected(ds: string): boolean {
+    if (ds === 'Web Search') {
+      return this.config.enableWebSearch;
+    }
+    return this.config.selectedDataStores &&
+        this.config.selectedDataStores.includes(ds);
+  }
+
+  /**
+   * Toggles the selection of a data store.
+   */
+  toggleDataStore(ds: string) {
+    if (ds === 'Web Search') {
+      this.config.enableWebSearch = !this.config.enableWebSearch;
+    } else {
+      if (!this.config.selectedDataStores) {
+        this.config.selectedDataStores = [];
+      }
+      const index = this.config.selectedDataStores.indexOf(ds);
+      if (index > -1) {
+        this.config.selectedDataStores.splice(index, 1);
+      } else {
+        this.config.selectedDataStores.push(ds);
+      }
     }
     this.onConfigChange();
   }
