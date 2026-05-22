@@ -50,7 +50,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.stateService.config$.pipe(takeUntil(this.destroy$))
-        .subscribe((c: AppConfig) => this.config = {...c});
+        .subscribe((c: AppConfig) => this.config = structuredClone(c));
   }
 
   ngOnDestroy() {

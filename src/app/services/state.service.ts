@@ -1,5 +1,6 @@
 import {Injectable} from '@angular/core';
 import {BehaviorSubject} from 'rxjs';
+import {map} from 'rxjs/operators';
 
 import {AppConfig} from '../models/app-config.model';
 import {ResultRow} from '../models/result-row.model';
@@ -29,31 +30,42 @@ export class StateService {
       enableWebSearch: false
     };
 
+    let savedConfig: Partial<AppConfig> = {};
+
     if (typeof localStorage !== 'undefined') {
-      const savedConfig = localStorage.getItem(this.STORAGE_KEY);
-      if (savedConfig) {
-        try {
-          return {
-            ...defaultConfig,
-            ...(JSON.parse(savedConfig) as Partial<AppConfig>)
-          };
-        } catch (e) {
-          console.error('Error parsing saved config from localStorage', e);
-          return defaultConfig;
+      try {
+        const localData = localStorage.getItem(this.STORAGE_KEY);
+        if (localData) {
+          savedConfig = JSON.parse(localData) as Partial<AppConfig>;
         }
+      } catch (e) {
+        console.warn(
+            'localStorage is available but could not be read (maybe blocked by sandbox/policy):',
+            e);
       }
     }
-    return defaultConfig;
+
+    const {gCloudToken, geminiApiKey, ...safeConfig} = savedConfig;
+
+    return {
+      ...defaultConfig,
+      ...safeConfig,
+      gCloudToken: '',
+      geminiApiKey: '',
+    };
   }
 
   private configSubject =
       new BehaviorSubject<AppConfig>(this.loadInitialConfig());
   /** Observable of the application configuration. */
-  config$ = this.configSubject.asObservable();
+  config$ =
+      this.configSubject.asObservable().pipe(map(c => structuredClone(c)));
 
   private resultsSubject = new BehaviorSubject<ResultRow[]>([]);
   /** Observable of the evaluation results. */
-  results$ = this.resultsSubject.asObservable();
+  results$ =
+      this.resultsSubject.asObservable().pipe(map(r => structuredClone(r)));
+
 
   /** Sets the current active tab. */
   setTab(tab: string) {
@@ -62,19 +74,30 @@ export class StateService {
 
   /** Sets the application configuration. */
   setConfig(config: AppConfig) {
-    this.configSubject.next(config);
+    const clonedConfig = structuredClone(config);
+    this.configSubject.next(clonedConfig);
+
+    const {gCloudToken, geminiApiKey, ...localConfig} = clonedConfig;
+
     if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(this.STORAGE_KEY, JSON.stringify(config));
+      try {
+        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(localConfig));
+      } catch (e) {
+        console.warn(
+            'localStorage is available but could not be written (maybe blocked by sandbox/policy):',
+            e);
+      }
     }
   }
 
   /** Gets the current application configuration. */
   getCurrentConfig(): AppConfig {
-    return this.configSubject.value;
+    return structuredClone(this.configSubject.value);
   }
 
   /** Sets the evaluation results. */
   setResults(results: ResultRow[]) {
-    this.resultsSubject.next(results);
+    this.resultsSubject.next(structuredClone(results));
   }
 }
+
