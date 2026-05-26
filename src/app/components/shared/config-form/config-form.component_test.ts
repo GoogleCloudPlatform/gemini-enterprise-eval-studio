@@ -205,6 +205,24 @@ describe('ConfigFormComponent', () => {
          expect(component.models).not.toContain('disabled-model');
          expect(component.config.selectedModel).toBe('auto');
        });
+
+    it('should filter selectedDataStores to only include those belonging to the selected engine',
+       () => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+
+         component.engines = [{
+           name: 'engine1',
+           displayName: 'Engine 1',
+           dataStoreIds: ['ds1', 'ds2']
+         }];
+         component.config.selectedEngine = 'engine1';
+         component.config.selectedDataStores = ['ds1', 'ds3'];
+
+         component.onEngineChange();
+
+         expect(component.config.selectedDataStores).toEqual(['ds1']);
+       });
   });
 
   describe('canProceed', () => {

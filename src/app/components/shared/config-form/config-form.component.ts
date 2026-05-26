@@ -159,6 +159,13 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
         }
       }
       this.config.selectedModel = this.models[0] || '';
+
+      // Filter selected data stores to only include those belonging to the selected engine.
+      const validDataStores = selected.dataStoreIds || [];
+      if (this.config.selectedDataStores) {
+        this.config.selectedDataStores = this.config.selectedDataStores.filter(
+            ds => validDataStores.includes(ds));
+      }
     }
     this.onConfigChange();
   }
