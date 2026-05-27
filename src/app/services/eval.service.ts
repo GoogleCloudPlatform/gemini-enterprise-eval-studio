@@ -238,10 +238,45 @@ export class EvalService {
       }
 
       const data = await res.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (text) {
-        const score = parseFloat(text.trim());
-        return isNaN(score) ? 0 : score;
+        // 1. Remove markdown code block markers
+        text = text.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '');
+
+        // 2. Remove typical prefix strings like "Score: "
+        text = text.replace(
+            /^(?:Score|score|Rating|rating|Similarity Score|similarity score|Similarity score)\s*:\s*/g,
+            '');
+
+        // 3. Strip range and scale descriptors to avoid matching scale. Removed
+        // strings like these because the scale is mentioned in the instruction.
+        // Sample strings - endpoints (0.0, 1.0) between 0.0 and 1.0 / between
+        // 0 and 1 0.0 to 1.0 / 0 to 1 / 0-1 [0.0, 1.0] / [0, 1] out of 1 / out
+        // of 1.0 / 1 / / 1.0
+        let cleanText = text.replace(
+            /between\s+0?(?:\.0)?\s+(?:and|to)\s+1?(?:\.0)?/gi, '');
+        cleanText =
+            cleanText.replace(/0?(?:\.0)?\s*(?:-|to)\s*1?(?:\.0)?/g, '');
+        cleanText =
+            cleanText.replace(/\[\s*0?(?:\.0)?\s*,\s*1?(?:\.0)?\s*\]/g, '');
+        cleanText = cleanText.replace(/out\s+of\s+1?(?:\.0)?/gi, '');
+        cleanText = cleanText.replace(/\/\s*1?(?:\.0)?/g, '');
+
+        cleanText = cleanText.trim();
+
+        // 4. Try direct parseFloat first
+        let score = parseFloat(cleanText);
+        if (!isNaN(score)) {
+          return score;
+        }
+
+        // 5. Fallback: match all decimal numbers in the text and use the last
+        // one
+        const matches = cleanText.match(/[0-9]+(?:\.[0-9]+)?/g);
+        if (matches && matches.length > 0) {
+          const lastScore = parseFloat(matches[matches.length - 1]);
+          return isNaN(lastScore) ? 0 : lastScore;
+        }
       }
       return 0;
     } catch (error) {
