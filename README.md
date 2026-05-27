@@ -42,6 +42,26 @@ architecture:
     are governed solely by the customer's existing agreements with Google Cloud
     for the specific APIs used (e.g., Vertex AI APIs).
 
+## Prerequisites
+
+Before running the application, you will need the following:
+
+1.  **Google Cloud Access Token**: Obtain a temporary access token by running
+    the following command in your terminal (you can open Cloud Shell using the
+    terminal icon on the top right of the Google Cloud Console home page):
+
+    ```sh
+    gcloud auth print-access-token
+    ```
+
+    *Note: Access tokens are short-lived and will need to be refreshed periodically.*
+
+2.  **Gemini API Key**:
+    - Navigate to the [Google Cloud Console](https://console.cloud.google.com).
+    - Search for and go to **Credentials** (under the *APIs & Services* section).
+    - Look for the API key configured for Gemini under the **API Keys** section.
+    - You can verify the key's allowed scope by checking the restrictions column to see which APIs can be accessed with that specific API key.
+
 ## Running Locally
 
 To run the development server using npm and Angular CLI:
