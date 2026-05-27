@@ -12,7 +12,11 @@
     <h3 class="text-lg font-medium mt-4 mb-2 text-gray-800">1. Prerequisites</h3>
     <ul class="list-disc pl-5 mb-4 text-gray-700 space-y-2">
       <li>
-        <strong>Google Cloud Access Token</strong>: You can get this by running <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-200">gcloud auth print-access-token</code> in your terminal. You can open Cloud Shell (terminal icon on the top right of the Google Cloud Console home page) to run this command. Note that these tokens are ephemeral and expire, so you may need to refresh them periodically.
+        <code class="bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono border border-gray-200">gcloud auth print-access-token</code> in your terminal. You can open Cloud Shell (terminal icon on the top right of the Google Cloud Console home page) to run this command.
+        <div class="my-3 flex justify-center">
+          <img src="src/assets/cloud_shell_icon.png" alt="Cloud Shell Terminal Button" class="border border-gray-200 rounded shadow-sm max-w-xs md:max-w-sm" />
+        </div>
+        <strong>Note: that these tokens are ephemeral and expire, so you may need to refresh them periodically.</strong>
       </li>
       <li>
         <strong>Gemini API Key</strong>: Search for <strong>Credentials</strong> on the Google Cloud Console home page and then look for the API key configured for Gemini under the <strong>API Keys</strong> section. You can check the key's restrictions to see what specific APIs can be accessed with that API key.

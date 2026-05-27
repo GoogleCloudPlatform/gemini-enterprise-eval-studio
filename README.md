@@ -46,15 +46,16 @@ architecture:
 
 Before running the application, you will need the following:
 
-1.  **Google Cloud Access Token**: Obtain a temporary access token by running
-    the following command in your terminal (you can open Cloud Shell using the
-    terminal icon on the top right of the Google Cloud Console home page):
+1.  **Google Cloud Access Token**: Obtain a temporary access token by running the following command in your terminal (you can open Cloud Shell using the terminal icon on the top right of the Google Cloud Console home page):
 
     ```sh
     gcloud auth print-access-token
     ```
-
     *Note: Access tokens are short-lived and will need to be refreshed periodically.*
+
+
+    ![Cloud Shell Terminal Button](src/assets/cloud_shell_icon.png)
+
 
 2.  **Gemini API Key**:
     - Navigate to the [Google Cloud Console](https://console.cloud.google.com).
