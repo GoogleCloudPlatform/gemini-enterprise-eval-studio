@@ -40,7 +40,7 @@ import {StateService} from './services/state.service';
   templateUrl: './app.component.html',
 })
 export class AppComponent implements OnInit, OnDestroy {
-  currentTab = 'run';
+  currentTab = 'golden';
   private readonly destroy$ = new Subject<void>();
 
   constructor(private stateService: StateService) {}

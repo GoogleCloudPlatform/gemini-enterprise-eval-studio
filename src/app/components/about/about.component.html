@@ -52,7 +52,7 @@
       <li><strong>TTFT (Time to First Token)</strong>: Latency until the first chunk of data (text or thought) is received from the model.</li>
       <li><strong>TFUFT (Time to First User Facing Token)</strong>: Latency until the first actual text response (excluding internal chain-of-thought) is received.</li>
       <li><strong>Latency</strong>: Total time taken for the entire response to stream.</li>
-      <li><strong>Score</strong>: A semantic similarity score (0.0 to 1.0) calculated by Gemini comparing the fetched response to your golden response.</li>
+      <li><strong>Score</strong>: A score (0.0 to 1.0) calculated by Gemini based on your defined rubrics or metrics, comparing the fetched response to your golden response.</li>
     </ul>
 
     <h3 class="text-lg font-medium mt-4 mb-2 text-gray-800">4. Interpretation of Results</h3>
@@ -65,7 +65,7 @@
 
     <h2 class="text-xl font-semibold mt-6 mb-3 text-gray-900">Data Privacy & Governance</h2>
     <p class="text-gray-700 mb-4 leading-relaxed">
-      All sensitive tokens and keys are stored only in your browser's local storage for your convenience. They are never sent to any server other than directly to Google's official APIs during execution.
+      Sensitive tokens and keys (such as the Google Cloud Access Token and Gemini API Key) are kept only in memory during your session and are not stored in your browser's local storage. They are never sent to any server other than directly to Google's official APIs during execution.
     </p>
     <p class="text-gray-700 mb-4 leading-relaxed">
       Gemini Enterprise Eval Studio is designed with a strict client-side, stateless architecture:
