@@ -16,6 +16,7 @@
 
 import {CommonModule} from '@angular/common';
 import {ChangeDetectorRef, Component, OnDestroy, OnInit} from '@angular/core';
+import {FormsModule} from '@angular/forms';
 import {Subject} from 'rxjs';
 import {takeUntil} from 'rxjs/operators';
 
@@ -33,7 +34,7 @@ import {ProgressBarComponent} from '../shared/progress-bar/progress-bar.componen
   standalone: true,
   imports: [
     CommonModule, ConfigFormComponent, FileUploadComponent, CsvTableComponent,
-    ProgressBarComponent
+    ProgressBarComponent, FormsModule
   ],
   templateUrl: './run-evaluation.component.html'
 })
@@ -48,6 +49,9 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
   results: any[] = [];
   totalRows = 0;
   completedRows = 0;
+  showReRateModal = false;
+  reRateInstruction = '';
+  errorMessage: string | null = null;
   private readonly destroy$ = new Subject<void>();
 
   columns: ColumnDef[] = [
@@ -89,6 +93,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
    * @param event The event containing the file and parsed rows.
    */
   async startEvaluation(event: {file: File, rows: CSVRow[]}) {
+    this.errorMessage = null;
     this.isProcessing = true;
     this.progress = 0;
     this.totalRows = event.rows.length;
@@ -111,6 +116,10 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
         this.cdr.detectChanges();
       });
 
+      if (result.scoreError && !this.errorMessage) {
+        this.errorMessage = `Scoring failed for some rows: ${result.scoreError}`;
+      }
+
       results.push(result);
       this.completedRows++;
       this.cdr.detectChanges();
@@ -120,6 +129,68 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     this.stateService.setResults(results);
     this.isProcessing = false;
     this.step = 3;
+    this.cdr.detectChanges();
+  }
+
+  /** Opens the re-rate modal and loads active instructions. */
+  openReRateModal() {
+    const config = this.stateService.getCurrentConfig();
+    this.reRateInstruction = config.autoRaterInstruction || '';
+    this.showReRateModal = true;
+    this.cdr.detectChanges();
+  }
+
+  /** Re-rates current evaluation results using updated instructions. */
+  async startReRate() {
+    if (this.isProcessing) return;
+    this.showReRateModal = false;
+    this.isProcessing = true;
+    this.progress = 0;
+    this.totalRows = this.results.length;
+    this.completedRows = 0;
+    this.cdr.detectChanges();
+
+    const config = this.stateService.getCurrentConfig();
+    config.autoRaterInstruction = this.reRateInstruction;
+    this.stateService.setConfig(config);
+
+    this.errorMessage = null;
+    const newResults: ResultRow[] = [];
+
+    for (let i = 0; i < this.results.length; i++) {
+      const row = this.results[i];
+      this.progress = Math.round((i / this.totalRows) * 100);
+      this.cdr.detectChanges();
+
+      let score = 0;
+      if (config.geminiApiKey && row.golden && row.fetched) {
+        try {
+          score = await this.evalService.scoreResponse(
+              row.query, row.fetched, row.golden, config);
+        } catch (error) {
+          this.errorMessage = `Re-rating failed: ${(error as Error).message}`;
+          // Push the remaining rows unchanged
+          for (let j = i; j < this.results.length; j++) {
+            newResults.push(this.results[j]);
+          }
+          break;
+        }
+      }
+
+      newResults.push({
+        ...row,
+        score
+      });
+
+      this.completedRows++;
+      this.cdr.detectChanges();
+    }
+
+    if (!this.errorMessage) {
+      this.progress = 100;
+    }
+    this.stateService.setResults(newResults);
+    this.isProcessing = false;
     this.cdr.detectChanges();
   }
 }

@@ -113,4 +113,79 @@ describe('EvalService', () => {
       expect(score).toBe(0.85);
     });
   });
+
+  describe('scoreResponse error handling', () => {
+    const config: AppConfig = {
+      gCloudToken: 'token',
+      projectId: 'project',
+      region: 'global',
+      selectedEngine: 'engine',
+      selectedModel: 'model',
+      geminiApiKey: 'key',
+      autoRaterInstruction: 'instructions',
+      selectedDataStores: [],
+      enableWebSearch: false
+    };
+
+    it('should throw an error if the response is not ok', async () => {
+      spyOn(globalThis, 'fetch').and.returnValue(Promise.resolve(new Response('', {
+        status: 500,
+        statusText: 'Internal Server Error'
+      })));
+
+      await expectAsync(service.scoreResponse('query', 'response', 'golden', config))
+          .toBeRejectedWithError(/HTTP error! status: 500/);
+    });
+  });
+
+  describe('processRow', () => {
+    const config: AppConfig = {
+      gCloudToken: 'token',
+      projectId: 'project',
+      region: 'global',
+      selectedEngine: 'engine',
+      selectedModel: 'model',
+      geminiApiKey: 'key',
+      autoRaterInstruction: 'instructions',
+      selectedDataStores: [],
+      enableWebSearch: false
+    };
+
+    it('should preserve the fetched text if scoring throws an error', async () => {
+      let fetchCount = 0;
+      spyOn(globalThis, 'fetch').and.callFake((input, init) => {
+        fetchCount++;
+        if (fetchCount === 1) {
+          return Promise.resolve(new Response(JSON.stringify([{
+            answer: {
+              replies: [{
+                groundedContent: {
+                  content: {
+                    text: 'Fetched response text'
+                  }
+                }
+              }]
+            }
+          }])));
+        } else {
+          return Promise.resolve(new Response('', {
+            status: 500,
+            statusText: 'Internal Server Error'
+          }));
+        }
+      });
+
+      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
+
+      const result = await service.processRow({
+        query: 'my query',
+        golden: 'my golden'
+      });
+
+      expect(result.fetched).toBe('Fetched response text');
+      expect(result.score).toBe(0);
+      expect(result.scoreError).toContain('HTTP error! status: 500');
+    });
+  });
 });
+

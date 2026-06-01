@@ -14,6 +14,22 @@
     </div>
   </div>
 
+  <!-- Error Banner -->
+  <div *ngIf="errorMessage" class="bg-red-50 border-l-4 border-red-400 p-4 rounded-md">
+    <div class="flex">
+      <div class="flex-shrink-0">
+        <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+        </svg>
+      </div>
+      <div class="ml-3">
+        <p class="text-sm text-red-700">
+          {{ errorMessage }}
+        </p>
+      </div>
+    </div>
+  </div>
+
   <!-- Configuration Form -->
   <app-config-form *ngIf="step === 1" (next)="nextStep()"></app-config-form>
 
@@ -35,13 +51,23 @@
     [title]="'Evaluation Results'"
     [exportFileName]="'eval_results'"
   >
-    <button
-      footer
-      (click)="prevStep()"
-      class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
-    >
-      Back to Upload
-    </button>
+    <div class="flex justify-between items-center w-full" footer>
+      <button
+        (click)="prevStep()"
+        class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
+      >
+        Back to Upload
+      </button>
+      <button
+        (click)="openReRateModal()"
+        class="bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 rounded-md hover:bg-blue-100 transition-colors font-medium flex items-center space-x-2"
+      >
+        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+        </svg>
+        <span>Re-rate Responses</span>
+      </button>
+    </div>
   </app-csv-table>
 
   <!-- Progress Bar -->
@@ -50,4 +76,36 @@
     [progress]="progress"
     [text]="'Evaluating... (' + completedRows + ' / ' + totalRows + ')'"
   ></app-progress-bar>
+
+  <!-- Re-rate Modal -->
+  <div *ngIf="showReRateModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+    <div class="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all max-w-lg w-full p-6 space-y-4">
+      <h3 class="text-lg font-medium text-gray-900">Re-rate Responses</h3>
+      <p class="text-sm text-gray-500">Update the auto-rater instruction to re-score the current responses without re-fetching them.</p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Auto Rater Instruction</label>
+        <textarea
+          [(ngModel)]="reRateInstruction"
+          rows="6"
+          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+          placeholder="Enter evaluation instructions..."
+        ></textarea>
+      </div>
+      <div class="flex justify-end space-x-3">
+        <button
+          (click)="showReRateModal = false"
+          class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          (click)="startReRate()"
+          [disabled]="!reRateInstruction"
+          class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Re-rate
+        </button>
+      </div>
+    </div>
+  </div>
 </div>
