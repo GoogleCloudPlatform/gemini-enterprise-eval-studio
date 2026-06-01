@@ -70,10 +70,15 @@ export class EvalService {
       body.toolsSpec.webGroundingSpec = {};
     }
 
+    const projectId = config.projectId;
+    const region = config.region;
+    const engineId = config.selectedEngine;
+
     const startTime = Date.now();
     let ttft = 0;
     let tfuft = 0;
     let fullText = '';
+    let assistToken = '';
     let isFirstChunk = true;
     let isFirstUserChunk = true;
 
@@ -91,10 +96,10 @@ export class EvalService {
       if (!response.ok) {
         if (response.status === 429) {
           const errorData = await response.json();
-          const assistToken = errorData.details?.[0]?.assistToken || 'unknown';
+          assistToken = errorData.details?.[0]?.assistToken || 'unknown';
           const reason =
               errorData.details?.[0]?.reason || 'Rate limit exceeded';
-          throw new Error(`Rate limited: ${reason} (Token: ${assistToken})`);
+          throw new Error(`Rate limited: ${reason}`);
         }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -131,6 +136,10 @@ export class EvalService {
             for (let i = processedItemsCount; i < parsedData.length; i++) {
               const item = parsedData[i];
               processedItemsCount++;
+
+              if (item.assistToken) {
+                assistToken = item.assistToken;
+              }
 
               if (item.answer?.state === 'SKIPPED') {
                 const reason =
@@ -183,7 +192,11 @@ export class EvalService {
         ttft,
         tfuft,
         latency,
-        score
+        score,
+        assistToken,
+        projectId,
+        region,
+        engineId
       };
 
     } catch (error) {
@@ -195,7 +208,11 @@ export class EvalService {
         ttft: 0,
         tfuft: 0,
         latency: 0,
-        score: 0
+        score: 0,
+        assistToken,
+        projectId,
+        region,
+        engineId
       };
     }
   }

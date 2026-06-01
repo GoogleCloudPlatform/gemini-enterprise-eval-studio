@@ -52,13 +52,7 @@ export class GetGoldenComponent {
   ];
   goldenFile: File|null = null;
   goldenCsvRows: Array<Record<string, string>> = [];
-  goldenResults: Array<{
-    query: string,
-    golden: string,
-    ttft: number,
-    tfuft: number,
-    latency: number
-  }> = [];
+  goldenResults: any[] = [];
   isProcessingGolden = false;
   goldenProgress = 0;
   totalRows = 0;
@@ -107,7 +101,11 @@ export class GetGoldenComponent {
         golden: result.fetched,
         ttft: result.ttft,
         tfuft: result.tfuft,
-        latency: result.latency
+        latency: result.latency,
+        assistToken: result.assistToken,
+        projectId: result.projectId,
+        region: result.region,
+        engineId: result.engineId
       });
 
       this.completedRows++;

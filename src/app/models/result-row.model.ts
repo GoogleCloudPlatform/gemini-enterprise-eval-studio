@@ -27,4 +27,8 @@ export interface ResultRow {
   tfuft: number;
   latency: number;
   score: number;
+  assistToken?: string;
+  projectId?: string;
+  region?: string;
+  engineId?: string;
 }
