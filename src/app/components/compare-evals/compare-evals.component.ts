@@ -166,11 +166,21 @@ export class CompareEvalsComponent {
     this.baselineRows.forEach(baseRow => {
       const recentRow = recentMap.get(baseRow['query']);
       if (recentRow) {
-        const baselineScore = Number(baseRow['score']) || 0;
-        const recentScore = Number(recentRow['score']) || 0;
+        const baselineScore = Number(baseRow['score'] || baseRow['autoraterscore'] || baseRow['bertscore']) || 0;
+        const recentScore = Number(recentRow['score'] || recentRow['autoraterscore'] || recentRow['bertscore']) || 0;
         const delta = Number((recentScore - baselineScore).toFixed(2));
-        this.comparisonResults.push(
-            {query: baseRow['query'], baselineScore, recentScore, delta});
+        
+        const baselineResponse = baseRow['fetched'] || baseRow['fetchedresponse'] || 'N/A';
+        const recentResponse = recentRow['fetched'] || recentRow['fetchedresponse'] || 'N/A';
+
+        this.comparisonResults.push({
+          query: baseRow['query'],
+          baselineScore,
+          recentScore,
+          delta,
+          baselineResponse,
+          recentResponse
+        });
       }
     });
     this.cdr.detectChanges();

@@ -22,4 +22,6 @@ export interface ComparisonResult {
   baselineScore: number;
   recentScore: number;
   delta: number;
+  baselineResponse?: string;
+  recentResponse?: string;
 }
