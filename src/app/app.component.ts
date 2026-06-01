@@ -21,7 +21,7 @@ import {takeUntil} from 'rxjs/operators';
 
 import {AboutComponent} from './components/about/about.component';
 import {CompareEvalsComponent} from './components/compare-evals/compare-evals.component';
-import {GetGoldenComponent} from './components/get-golden/get-golden.component';
+import {RunQueriesComponent} from './components/run-queries/run-queries.component';
 import {HeaderComponent} from './components/header/header.component';
 import {RunEvaluationComponent} from './components/run-evaluation/run-evaluation.component';
 import {SidebarComponent} from './components/sidebar/sidebar.component';
@@ -35,12 +35,12 @@ import {StateService} from './services/state.service';
   standalone: true,
   imports: [
     CommonModule, SidebarComponent, HeaderComponent, RunEvaluationComponent,
-    CompareEvalsComponent, GetGoldenComponent, AboutComponent
+    CompareEvalsComponent, RunQueriesComponent, AboutComponent
   ],
   templateUrl: './app.component.html',
 })
 export class AppComponent implements OnInit, OnDestroy {
-  currentTab = 'golden';
+  currentTab = 'queries';
   private readonly destroy$ = new Subject<void>();
 
   constructor(private stateService: StateService) {}

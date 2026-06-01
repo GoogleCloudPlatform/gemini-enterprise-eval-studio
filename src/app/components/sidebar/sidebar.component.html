@@ -14,9 +14,9 @@
   <!-- Navigation -->
   <ng-container *ngIf="currentTab$ | async as currentTab">
     <nav class="flex-1 p-4 space-y-1">
-      <button (click)="setTab('golden')" [ngClass]="{'bg-blue-50 text-blue-600': currentTab === 'golden', 'text-gray-700 hover:bg-gray-50': currentTab !== 'golden'}" class="w-full flex items-center space-x-2 p-2 rounded-md text-left transition-colors" aria-label="Get Golden">
+      <button (click)="setTab('queries')" [ngClass]="{'bg-blue-50 text-blue-600': currentTab === 'queries', 'text-gray-700 hover:bg-gray-50': currentTab !== 'queries'}" class="w-full flex items-center space-x-2 p-2 rounded-md text-left transition-colors" aria-label="Run Queries">
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
-        <span *ngIf="!isCollapsed">Get Golden</span>
+        <span *ngIf="!isCollapsed">Run Queries</span>
       </button>
       <button (click)="setTab('run')" [ngClass]="{'bg-blue-50 text-blue-600': currentTab === 'run', 'text-gray-700 hover:bg-gray-50': currentTab !== 'run'}" class="w-full flex items-center space-x-2 p-2 rounded-md text-left transition-colors" aria-label="Run Evaluation">
         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>

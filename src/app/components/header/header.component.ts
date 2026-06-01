@@ -48,8 +48,8 @@ export class HeaderComponent {
         return 'Run Evaluation';
       case 'compare':
         return 'Compare Evals';
-      case 'golden':
-        return 'Get Golden';
+      case 'queries':
+        return 'Run Queries';
       case 'about':
         return 'About Eval Studio';
       default:

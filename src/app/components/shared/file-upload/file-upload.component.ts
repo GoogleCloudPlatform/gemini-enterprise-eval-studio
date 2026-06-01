@@ -66,6 +66,7 @@ export class FileUploadComponent {
     if (files && files.length > 0) {
       this.handleFile(files[0]);
     }
+    target.value = '';
   }
 
   /**

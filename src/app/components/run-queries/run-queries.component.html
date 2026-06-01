@@ -23,7 +23,7 @@
     (prev)="prevStep()"
     (run)="startGoldenGeneration($event)"
     [instruction]="'CSV file with at least \'query\' column'"
-    [buttonText]="'Generate Golden Responses'"
+    [buttonText]="'Run Queries'"
     [requiredColumns]="['query']"
   ></app-file-upload>
 
@@ -39,8 +39,8 @@
     *ngIf="step === 3 && goldenResults.length > 0"
     [data]="goldenResults"
     [columns]="columns"
-    [title]="'Golden Dataset'"
-    [exportFileName]="'golden_dataset'"
+    [title]="'Query Results'"
+    [exportFileName]="'query_results'"
   >
     <button
       footer

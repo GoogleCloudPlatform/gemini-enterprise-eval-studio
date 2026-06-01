@@ -26,7 +26,7 @@ import {ResultRow} from '../models/result-row.model';
  */
 @Injectable({providedIn: 'root'})
 export class StateService {
-  private currentTabSubject = new BehaviorSubject<string>('golden');
+  private currentTabSubject = new BehaviorSubject<string>('queries');
   /** Observable of the current active tab. */
   currentTab$ = this.currentTabSubject.asObservable();
 

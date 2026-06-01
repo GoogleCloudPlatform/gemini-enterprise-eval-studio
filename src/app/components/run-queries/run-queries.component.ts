@@ -24,24 +24,24 @@ import {ColumnDef, CsvTableComponent} from '../shared/csv-table/csv-table.compon
 import {FileUploadComponent} from '../shared/file-upload/file-upload.component';
 import {ProgressBarComponent} from '../shared/progress-bar/progress-bar.component';
 
+/**
+ * Component for running queries and generating responses.
+ * It handles file upload, processing, and exporting results.
+ */
 @Component({
-  selector: 'app-get-golden',
+  selector: 'app-run-queries',
   standalone: true,
   imports: [
     CommonModule, ConfigFormComponent, FileUploadComponent,
     CsvTableComponent, ProgressBarComponent
   ],
-  templateUrl: './get-golden.component.html'
+  templateUrl: './run-queries.component.html'
 })
-/**
- * Component for generating golden responses.
- * It handles file upload, processing, and exporting results.
- */
-export class GetGoldenComponent {
+export class RunQueriesComponent {
   step = 1;
   columns: ColumnDef[] = [
     {header: 'Query', key: 'query', truncate: true}, {
-      header: 'Golden Response',
+      header: 'Response',
       key: 'golden',
       type: 'markdown',
       truncate: true

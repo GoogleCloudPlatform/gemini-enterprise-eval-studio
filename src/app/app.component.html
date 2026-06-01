@@ -10,7 +10,7 @@
 
     <!-- Content Area -->
     <main class="flex-1 overflow-auto p-6 bg-gray-50" tabindex="0" aria-label="Main content">
-      <app-get-golden [hidden]="currentTab !== 'golden'"></app-get-golden>
+      <app-run-queries [hidden]="currentTab !== 'queries'"></app-run-queries>
       <app-run-evaluation [hidden]="currentTab !== 'run'"></app-run-evaluation>
       <app-compare-evals [hidden]="currentTab !== 'compare'"></app-compare-evals>
       <app-about [hidden]="currentTab !== 'about'"></app-about>
