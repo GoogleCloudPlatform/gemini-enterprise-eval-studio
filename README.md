@@ -53,9 +53,9 @@ Before running the application, you will need the following:
     ```
     *Note: Access tokens are short-lived and will need to be refreshed periodically.*
 
-
-    ![Cloud Shell Terminal Button](src/assets/cloud_shell_icon.png)
-
+    <p align="center">
+      <img src="src/assets/cloud_shell_icon.png" alt="Cloud Shell Terminal Button" />
+    </p>
 
 2.  **Gemini API Key**:
     - Navigate to the [Google Cloud Console](https://console.cloud.google.com).
