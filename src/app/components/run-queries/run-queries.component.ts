@@ -19,6 +19,7 @@ import {ChangeDetectorRef, Component} from '@angular/core';
 
 import {CsvService} from '../../services/csv.service';
 import {EvalService} from '../../services/eval.service';
+import {StateService} from '../../services/state.service';
 import {ConfigFormComponent} from '../shared/config-form/config-form.component';
 import {ColumnDef, CsvTableComponent} from '../shared/csv-table/csv-table.component';
 import {FileUploadComponent} from '../shared/file-upload/file-upload.component';
@@ -60,7 +61,34 @@ export class RunQueriesComponent {
 
   constructor(
       private csvService: CsvService, private evalService: EvalService,
+      private stateService: StateService,
       private cdr: ChangeDetectorRef) {}
+
+  isConfigValid(): boolean {
+    const config = this.stateService.getCurrentConfig();
+    return !!(config.gCloudToken && config.projectId &&
+        config.selectedEngine && config.selectedModel);
+  }
+
+  isStepSelectable(targetStep: number): boolean {
+    if (targetStep === 1) {
+      return true;
+    }
+    if (targetStep === 2) {
+      return this.isConfigValid();
+    }
+    if (targetStep === 3) {
+      return this.goldenResults.length > 0;
+    }
+    return false;
+  }
+
+  goToStep(targetStep: number) {
+    if (this.isStepSelectable(targetStep)) {
+      this.step = targetStep;
+      this.cdr.detectChanges();
+    }
+  }
 
   nextStep() {
     if (this.step < 3) {

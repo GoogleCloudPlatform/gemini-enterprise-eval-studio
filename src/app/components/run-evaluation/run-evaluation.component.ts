@@ -78,6 +78,32 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     this.destroy$.complete();
   }
 
+  isConfigValid(): boolean {
+    const config = this.stateService.getCurrentConfig();
+    return !!(config.gCloudToken && config.projectId &&
+        config.selectedEngine && config.selectedModel && config.geminiApiKey);
+  }
+
+  isStepSelectable(targetStep: number): boolean {
+    if (targetStep === 1) {
+      return true;
+    }
+    if (targetStep === 2) {
+      return this.isConfigValid();
+    }
+    if (targetStep === 3) {
+      return this.results.length > 0;
+    }
+    return false;
+  }
+
+  goToStep(targetStep: number) {
+    if (this.isStepSelectable(targetStep)) {
+      this.step = targetStep;
+      this.cdr.detectChanges();
+    }
+  }
+
   /** Moves to the next step in the wizard. */
   nextStep() {
     if (this.step < 3) this.step++;

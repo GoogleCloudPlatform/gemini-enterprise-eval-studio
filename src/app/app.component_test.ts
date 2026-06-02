@@ -42,10 +42,26 @@ describe('AppComponent', () => {
       selectedDataStores: [],
       enableWebSearch: false
     });
-    mockStateService = jasmine.createSpyObj('StateService', [], {
-      currentTab$: currentTabSubject.asObservable(),
-      results$: resultsSubject.asObservable(),
-      config$: configSubject.asObservable()
+    mockStateService = jasmine.createSpyObj(
+        'StateService',
+        ['getCurrentConfig', 'setConfig', 'setResults'],
+        {
+          currentTab$: currentTabSubject.asObservable(),
+          results$: resultsSubject.asObservable(),
+          config$: configSubject.asObservable()
+        }
+    );
+
+    mockStateService.getCurrentConfig.and.returnValue({
+      gCloudToken: '',
+      projectId: '',
+      region: 'global',
+      selectedEngine: '',
+      selectedModel: '',
+      geminiApiKey: '',
+      autoRaterInstruction: '',
+      selectedDataStores: [],
+      enableWebSearch: false
     });
 
     await TestBed
