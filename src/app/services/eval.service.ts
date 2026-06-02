@@ -123,7 +123,8 @@ export class EvalService {
           } catch (e) {
             if (accumulatedText.startsWith('[')) {
               try {
-                parsedData = JSON.parse(accumulatedText + ']');
+                const cleanedText = accumulatedText.trim().replace(/,\s*$/, '');
+                parsedData = JSON.parse(cleanedText + ']');
               } catch (e2) {
                 continue;
               }
@@ -147,25 +148,27 @@ export class EvalService {
                 fullText = `SKIPPED: ${reason}`;
                 break;
               }
-              const content =
-                  item.answer?.replies?.[0]?.groundedContent?.content;
-              if (content) {
-                const text = content.text;
-                const thought = content.thought;
+              const replies = item.answer?.replies || [];
+              for (const reply of replies) {
+                const content = reply.groundedContent?.content;
+                if (content) {
+                  const text = content.text;
+                  const thought = content.thought;
 
-                if (text || thought) {
-                  if (isFirstChunk) {
-                    ttft = Date.now() - startTime;
-                    isFirstChunk = false;
-                  }
+                  if (text || thought) {
+                    if (isFirstChunk) {
+                      ttft = Date.now() - startTime;
+                      isFirstChunk = false;
+                    }
 
-                  if (!thought && text && isFirstUserChunk) {
-                    tfuft = Date.now() - startTime;
-                    isFirstUserChunk = false;
-                  }
+                    if (!thought && text && isFirstUserChunk) {
+                      tfuft = Date.now() - startTime;
+                      isFirstUserChunk = false;
+                    }
 
-                  if (text && !thought) {
-                    fullText += text;
+                    if (text && !thought) {
+                      fullText += text;
+                    }
                   }
                 }
               }

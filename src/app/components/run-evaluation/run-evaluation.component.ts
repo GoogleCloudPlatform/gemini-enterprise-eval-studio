@@ -29,6 +29,10 @@ import {ColumnDef, CsvTableComponent} from '../shared/csv-table/csv-table.compon
 import {FileUploadComponent} from '../shared/file-upload/file-upload.component';
 import {ProgressBarComponent} from '../shared/progress-bar/progress-bar.component';
 
+/**
+ * Container component for the Run Evaluation tab, managing steps and evaluation
+ * process.
+ */
 @Component({
   selector: 'app-run-evaluation',
   standalone: true,
@@ -38,15 +42,13 @@ import {ProgressBarComponent} from '../shared/progress-bar/progress-bar.componen
   ],
   templateUrl: './run-evaluation.component.html'
 })
-/**
- * Container component for the Run Evaluation tab, managing steps and evaluation
- * process.
- */
 export class RunEvaluationComponent implements OnInit, OnDestroy {
   step = 1;
   isProcessing = false;
   progress = 0;
   results: any[] = [];
+  uploadedFile: File|null = null;
+  uploadedRows: any[] = [];
   totalRows = 0;
   completedRows = 0;
   showReRateModal = false;
@@ -80,8 +82,12 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
 
   isConfigValid(): boolean {
     const config = this.stateService.getCurrentConfig();
+    const engines = this.stateService.getEngines();
+    const hasValidEngine = engines.some(e => e.name === config.selectedEngine);
     return !!(config.gCloudToken && config.projectId &&
-        config.selectedEngine && config.selectedModel && config.geminiApiKey);
+        config.selectedEngine && config.selectedModel &&
+        hasValidEngine &&
+        config.geminiApiKey);
   }
 
   isStepSelectable(targetStep: number): boolean {

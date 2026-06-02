@@ -18,7 +18,7 @@ import {Injectable} from '@angular/core';
 import {BehaviorSubject} from 'rxjs';
 import {map} from 'rxjs/operators';
 
-import {AppConfig} from '../models/app-config.model';
+import {AppConfig, Engine} from '../models/app-config.model';
 import {ResultRow} from '../models/result-row.model';
 
 /**
@@ -82,6 +82,11 @@ export class StateService {
   results$ =
       this.resultsSubject.asObservable().pipe(map(r => structuredClone(r)));
 
+  private enginesSubject = new BehaviorSubject<Engine[]>([]);
+  /** Observable of the fetched engines. */
+  engines$ =
+      this.enginesSubject.asObservable().pipe(map(e => structuredClone(e)));
+
 
   /** Sets the current active tab. */
   setTab(tab: string) {
@@ -114,6 +119,16 @@ export class StateService {
   /** Sets the evaluation results. */
   setResults(results: ResultRow[]) {
     this.resultsSubject.next(structuredClone(results));
+  }
+
+  /** Sets the fetched engines. */
+  setEngines(engines: Engine[]) {
+    this.enginesSubject.next(structuredClone(engines));
+  }
+
+  /** Gets the currently fetched engines. */
+  getEngines(): Engine[] {
+    return structuredClone(this.enginesSubject.value);
   }
 }
 

@@ -66,7 +66,20 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.stateService.config$.pipe(takeUntil(this.destroy$))
-        .subscribe((c: AppConfig) => this.config = structuredClone(c));
+        .subscribe((c: AppConfig) => {
+          this.config = structuredClone(c);
+          if (this.engines.length > 0) {
+            this.updateModelsForSelectedEngine();
+          }
+        });
+
+    this.stateService.engines$.pipe(takeUntil(this.destroy$))
+        .subscribe((engines: Engine[]) => {
+          this.engines = engines;
+          if (this.config.selectedEngine && this.engines.length > 0) {
+            this.updateModelsForSelectedEngine();
+          }
+        });
   }
 
   ngOnDestroy() {
@@ -110,6 +123,8 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
                                      dataStoreIds: e.dataStoreIds
                                    }));
 
+              this.stateService.setEngines(this.engines);
+
               if (this.config.selectedEngine) {
                 const exists = this.engines.some(
                     e => e.name === this.config.selectedEngine);
@@ -127,12 +142,15 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
               this.cdr.detectChanges();
             } else {
               this.engines = [];
+              this.stateService.setEngines([]);
               this.errorMessage = 'No engines found.';
               this.cdr.detectChanges();
             }
           },
           error: (error) => {
             this.loading = false;
+            this.engines = [];
+            this.stateService.setEngines([]);
             this.errorMessage =
                 'Error fetching engines. See console for details.';
             this.cdr.detectChanges();
@@ -143,7 +161,8 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   /**
    * Handles engine selection change, updating available models.
    */
-  onEngineChange() {
+  /** Populates models list based on selected engine, without resetting selectedModel if it's valid. */
+  updateModelsForSelectedEngine() {
     const selected =
         this.engines.find(e => e.name === this.config.selectedEngine);
     if (selected) {
@@ -158,7 +177,11 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
           }
         }
       }
-      this.config.selectedModel = this.models[0] || '';
+
+      // Only overwrite if current model is not valid for this engine
+      if (!this.config.selectedModel || !this.models.includes(this.config.selectedModel)) {
+        this.config.selectedModel = this.models[0] || '';
+      }
 
       // Filter selected data stores to only include those belonging to the selected engine.
       const validDataStores = selected.dataStoreIds || [];
@@ -167,6 +190,10 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
             ds => validDataStores.includes(ds));
       }
     }
+  }
+
+  onEngineChange() {
+    this.updateModelsForSelectedEngine();
     this.onConfigChange();
   }
 

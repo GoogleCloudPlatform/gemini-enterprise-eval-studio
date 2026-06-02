@@ -36,8 +36,11 @@ export class FileUploadComponent {
   @Input() buttonText = 'Upload';
   @Input() requiredColumns: string[] = [];
 
-  file: File|null = null;
-  csvRows: any[] = [];
+  @Input() file: File|null = null;
+  @Output() readonly fileChange = new EventEmitter<File|null>();
+  @Input() csvRows: any[] = [];
+  @Output() readonly csvRowsChange = new EventEmitter<any[]>();
+
   uploadError = '';
   isParsing = false;
 
@@ -77,10 +80,13 @@ export class FileUploadComponent {
     if (!file.name.toLowerCase().endsWith('.csv')) {
       this.uploadError = 'Please upload a valid CSV file.';
       this.file = null;
+      this.fileChange.emit(null);
       this.csvRows = [];
+      this.csvRowsChange.emit([]);
       return;
     }
     this.file = file;
+    this.fileChange.emit(file);
     this.uploadError = '';
     this.isParsing = true;
     this.csvService.parseCSV(file, (data) => {
@@ -100,14 +106,28 @@ export class FileUploadComponent {
         const missingColumns = lowerCaseRequiredColumns.filter(col => !headers.includes(col));
         if (missingColumns.length > 0) {
           this.uploadError = `CSV must contain columns: ${this.requiredColumns.join(', ')}. Missing: ${missingColumns.join(', ')}`;
+          this.file = null;
+          this.fileChange.emit(null);
+          this.csvRows = [];
+          this.csvRowsChange.emit([]);
+        } else {
+          this.csvRowsChange.emit(this.csvRows);
         }
       } else {
         this.uploadError = 'CSV file is empty or contains no data rows.';
+        this.file = null;
+        this.fileChange.emit(null);
+        this.csvRows = [];
+        this.csvRowsChange.emit([]);
       }
       this.cdr.detectChanges();
     }, (err) => {
       this.uploadError = err;
       this.isParsing = false;
+      this.file = null;
+      this.fileChange.emit(null);
+      this.csvRows = [];
+      this.csvRowsChange.emit([]);
       this.cdr.detectChanges();
     });
   }

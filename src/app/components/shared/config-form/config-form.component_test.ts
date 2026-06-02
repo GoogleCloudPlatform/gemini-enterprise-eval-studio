@@ -18,7 +18,7 @@ import {HttpClient} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {BehaviorSubject, of, throwError} from 'rxjs';
 
-import {AppConfig} from '../../../models/app-config.model';
+import {AppConfig, Engine} from '../../../models/app-config.model';
 import {StateService} from '../../../services/state.service';
 
 import {ConfigFormComponent} from './config-form.component';
@@ -27,6 +27,7 @@ describe('ConfigFormComponent', () => {
   let mockStateService: jasmine.SpyObj<StateService>;
   let mockHttpClient: jasmine.SpyObj<HttpClient>;
   let configSubject: BehaviorSubject<AppConfig>;
+  let enginesSubject: BehaviorSubject<Engine[]>;
 
   beforeEach(async () => {
     configSubject = new BehaviorSubject<AppConfig>({
@@ -41,8 +42,15 @@ describe('ConfigFormComponent', () => {
       enableWebSearch: false
     });
 
+    enginesSubject = new BehaviorSubject<Engine[]>([]);
+
     mockStateService = jasmine.createSpyObj(
-        'StateService', ['setConfig'], {config$: configSubject.asObservable()});
+        'StateService', ['setConfig', 'setEngines', 'getCurrentConfig'], {
+          config$: configSubject.asObservable(),
+          engines$: enginesSubject.asObservable()
+        });
+
+    mockStateService.getCurrentConfig.and.callFake(() => configSubject.value);
 
     mockHttpClient = jasmine.createSpyObj('HttpClient', ['get']);
 

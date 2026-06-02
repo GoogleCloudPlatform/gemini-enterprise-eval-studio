@@ -58,44 +58,50 @@
   </div>
 
   <!-- Configuration Form -->
-  <app-config-form *ngIf="step === 1" (next)="nextStep()"></app-config-form>
+  <div [hidden]="step !== 1">
+    <app-config-form (next)="nextStep()"></app-config-form>
+  </div>
 
   <!-- File Upload -->
-  <app-file-upload
-    *ngIf="step === 2"
-    (prev)="prevStep()"
-    (run)="startEvaluation($event)"
-    [instruction]="'CSV file with at least \'query\' and \'golden\' columns'"
-    [buttonText]="'Run Evaluation'"
-    [requiredColumns]="['query', 'golden']"
-  ></app-file-upload>
+  <div [hidden]="step !== 2">
+    <app-file-upload
+      [(file)]="uploadedFile"
+      [(csvRows)]="uploadedRows"
+      (prev)="prevStep()"
+      (run)="startEvaluation($event)"
+      [instruction]="'CSV file with at least \'query\' and \'golden\' columns'"
+      [buttonText]="'Run Evaluation'"
+      [requiredColumns]="['query', 'golden']"
+    ></app-file-upload>
+  </div>
 
   <!-- Results Table -->
-  <app-csv-table
-    *ngIf="step === 3"
-    [data]="results"
-    [columns]="columns"
-    [title]="'Evaluation Results'"
-    [exportFileName]="'eval_results'"
-  >
-    <div class="flex justify-between items-center w-full" footer>
-      <button
-        (click)="prevStep()"
-        class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
-      >
-        Back to Upload
-      </button>
-      <button
-        (click)="openReRateModal()"
-        class="bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 rounded-md hover:bg-blue-100 transition-colors font-medium flex items-center space-x-2"
-      >
-        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-        </svg>
-        <span>Re-rate Responses</span>
-      </button>
-    </div>
-  </app-csv-table>
+  <div [hidden]="step !== 3">
+    <app-csv-table
+      [data]="results"
+      [columns]="columns"
+      [title]="'Evaluation Results'"
+      [exportFileName]="'eval_results'"
+    >
+      <div class="flex justify-between items-center w-full" footer>
+        <button
+          (click)="prevStep()"
+          class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
+        >
+          Back to Upload
+        </button>
+        <button
+          (click)="openReRateModal()"
+          class="bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2 rounded-md hover:bg-blue-100 transition-colors font-medium flex items-center space-x-2"
+        >
+          <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+          </svg>
+          <span>Re-rate Responses</span>
+        </button>
+      </div>
+    </app-csv-table>
+  </div>
 
   <!-- Progress Bar -->
   <app-progress-bar

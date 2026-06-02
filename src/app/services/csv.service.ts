@@ -16,7 +16,7 @@
 
 import {Injectable, NgZone} from '@angular/core';
 
-declare var Papa: any;
+import * as Papa from 'papaparse';
 
 /**
  * Service for parsing and exporting CSV files.
@@ -36,7 +36,7 @@ export class CsvService {
       onError: (error: string) => void) {
     Papa.parse(file, {
       header: true,
-      skipEmptyLines: 'greedy',
+      skipEmptyLines: true,
       complete: (results: {data: Array<Record<string, string>>}) => {
         this.ngZone.run(() => {
           callback(results.data.slice(0, 100));

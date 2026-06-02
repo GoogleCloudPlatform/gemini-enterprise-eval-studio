@@ -42,17 +42,22 @@
   </div>
 
   <!-- Configuration Form -->
-  <app-config-form *ngIf="step === 1" [isGetGolden]="true" (next)="nextStep()"></app-config-form>
+  <div [hidden]="step !== 1">
+    <app-config-form [isGetGolden]="true" (next)="nextStep()"></app-config-form>
+  </div>
 
   <!-- File Upload -->
-  <app-file-upload
-    *ngIf="step === 2"
-    (prev)="prevStep()"
-    (run)="startGoldenGeneration($event)"
-    [instruction]="'CSV file with at least \'query\' column'"
-    [buttonText]="'Run Queries'"
-    [requiredColumns]="['query']"
-  ></app-file-upload>
+  <div [hidden]="step !== 2">
+    <app-file-upload
+      [(file)]="goldenFile"
+      [(csvRows)]="goldenCsvRows"
+      (prev)="prevStep()"
+      (run)="startGoldenGeneration($event)"
+      [instruction]="'CSV file with at least \'query\' column'"
+      [buttonText]="'Run Queries'"
+      [requiredColumns]="['query']"
+    ></app-file-upload>
+  </div>
 
   <!-- Progress Bar -->
   <app-progress-bar
@@ -62,19 +67,20 @@
   ></app-progress-bar>
 
   <!-- Results Table -->
-  <app-csv-table
-    *ngIf="step === 3 && goldenResults.length > 0"
-    [data]="goldenResults"
-    [columns]="columns"
-    [title]="'Query Results'"
-    [exportFileName]="'query_results'"
-  >
-    <button
-      footer
-      (click)="prevStep()"
-      class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
+  <div [hidden]="step !== 3 || goldenResults.length === 0">
+    <app-csv-table
+      [data]="goldenResults"
+      [columns]="columns"
+      [title]="'Query Results'"
+      [exportFileName]="'query_results'"
     >
-      Back to Upload
-    </button>
-  </app-csv-table>
+      <button
+        footer
+        (click)="prevStep()"
+        class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
+      >
+        Back to Upload
+      </button>
+    </app-csv-table>
+  </div>
 </div>

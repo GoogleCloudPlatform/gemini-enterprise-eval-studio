@@ -66,7 +66,19 @@ export class CsvTableComponent {
    */
   renderMarkdown(text: string): string {
     if (!text) return '';
-    return marked.parse(text);
+    if (typeof marked !== 'undefined' && marked && typeof marked.parse === 'function') {
+      try {
+        return marked.parse(text);
+      } catch (e) {
+        console.error('Failed to parse markdown with marked:', e);
+      }
+    }
+    // Fallback to raw text with basic escaping and line breaks
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
   }
 
   /**

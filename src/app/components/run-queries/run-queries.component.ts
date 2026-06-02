@@ -66,8 +66,11 @@ export class RunQueriesComponent {
 
   isConfigValid(): boolean {
     const config = this.stateService.getCurrentConfig();
+    const engines = this.stateService.getEngines();
+    const hasValidEngine = engines.some(e => e.name === config.selectedEngine);
     return !!(config.gCloudToken && config.projectId &&
-        config.selectedEngine && config.selectedModel);
+        config.selectedEngine && config.selectedModel &&
+        hasValidEngine);
   }
 
   isStepSelectable(targetStep: number): boolean {
@@ -124,7 +127,7 @@ export class RunQueriesComponent {
       const csvRow: any = {query: row['query']};
       const result = await this.evalService.processRow(csvRow);
 
-      this.goldenResults.push({
+      this.goldenResults = [...this.goldenResults, {
         query: result.query,
         golden: result.fetched,
         ttft: result.ttft,
@@ -134,7 +137,7 @@ export class RunQueriesComponent {
         projectId: result.projectId,
         region: result.region,
         engineId: result.engineId
-      });
+      }];
 
       this.completedRows++;
       this.goldenProgress =

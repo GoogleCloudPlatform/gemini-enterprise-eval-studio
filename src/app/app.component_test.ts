@@ -18,7 +18,7 @@ import {TestBed} from '@angular/core/testing';
 import {BehaviorSubject} from 'rxjs';
 
 import {AppComponent} from './app.component';
-import {AppConfig} from './models/app-config.model';
+import {AppConfig, Engine} from './models/app-config.model';
 import {ResultRow} from './models/result-row.model';
 import {StateService} from './services/state.service';
 
@@ -27,6 +27,7 @@ describe('AppComponent', () => {
   let currentTabSubject: BehaviorSubject<string>;
   let resultsSubject: BehaviorSubject<ResultRow[]>;
   let configSubject: BehaviorSubject<AppConfig>;
+  let enginesSubject: BehaviorSubject<Engine[]>;
 
   beforeEach(async () => {
     currentTabSubject = new BehaviorSubject<string>('run');
@@ -42,16 +43,15 @@ describe('AppComponent', () => {
       selectedDataStores: [],
       enableWebSearch: false
     });
+    enginesSubject = new BehaviorSubject<Engine[]>([]);
     mockStateService = jasmine.createSpyObj(
-        'StateService',
-        ['getCurrentConfig', 'setConfig', 'setResults'],
-        {
+        'StateService', ['getCurrentConfig', 'getEngines'], {
           currentTab$: currentTabSubject.asObservable(),
           results$: resultsSubject.asObservable(),
-          config$: configSubject.asObservable()
-        }
-    );
-
+          config$: configSubject.asObservable(),
+          engines$: enginesSubject.asObservable()
+        });
+    mockStateService.getEngines.and.returnValue([]);
     mockStateService.getCurrentConfig.and.returnValue({
       gCloudToken: '',
       projectId: '',
