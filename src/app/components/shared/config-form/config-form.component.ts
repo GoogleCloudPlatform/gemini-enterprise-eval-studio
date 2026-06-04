@@ -16,7 +16,7 @@
 
 import {CommonModule} from '@angular/common';
 import {HttpClient} from '@angular/common/http';
-import {ChangeDetectorRef, Component, EventEmitter, Input, OnDestroy, OnInit, Output} from '@angular/core';
+import {ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {Subject} from 'rxjs';
 import {takeUntil} from 'rxjs/operators';
@@ -42,6 +42,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   @Output() readonly next = new EventEmitter<void>();
   @Input() isGetGolden = false;
+  @ViewChild('dropdownContainer') dropdownContainer?: ElementRef;
 
   config: AppConfig = {
     gCloudToken: '',
@@ -59,6 +60,9 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   models: string[] = [];
   loading = false;
   errorMessage = '';
+
+  isDropdownOpen = false;
+  connectorSearchQuery = '';
 
   constructor(
       private stateService: StateService, private cdr: ChangeDetectorRef,
@@ -240,6 +244,48 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
    */
   onConfigChange() {
     this.stateService.setConfig(this.config);
+  }
+
+  @HostListener('document:click', ['$event'])
+  clickout(event: any) {
+    if (this.isDropdownOpen && this.dropdownContainer &&
+        !this.dropdownContainer.nativeElement.contains(event.target)) {
+      this.isDropdownOpen = false;
+    }
+  }
+
+  toggleDropdown() {
+    this.isDropdownOpen = !this.isDropdownOpen;
+  }
+
+  getAllAvailableConnectors(): {id: string, label: string}[] {
+    const engine = this.getSelectedEngine();
+    const list: {id: string, label: string}[] = [];
+    if (engine && engine.dataStoreIds) {
+      engine.dataStoreIds.forEach(ds => {
+        list.push({id: ds, label: ds});
+      });
+    }
+    list.push({id: 'Web Search', label: 'Web Search'});
+    return list;
+  }
+
+  filteredConnectors(): {id: string, label: string}[] {
+    const all = this.getAllAvailableConnectors();
+    if (!this.connectorSearchQuery) {
+      return all;
+    }
+    const q = this.connectorSearchQuery.toLowerCase();
+    return all.filter(c => c.label.toLowerCase().includes(q));
+  }
+
+  getSelectedConnectorsSummary(): string {
+    const count = (this.config.selectedDataStores?.length || 0) +
+        (this.config.enableWebSearch ? 1 : 0);
+    if (count === 0) {
+      return 'Select Connectors';
+    }
+    return `${count} Connector${count > 1 ? 's' : ''} Selected`;
   }
 
   /**

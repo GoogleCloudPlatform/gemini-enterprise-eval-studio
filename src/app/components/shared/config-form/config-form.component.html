@@ -114,8 +114,8 @@
             <option *ngFor="let m of models" [value]="m">{{ m }}</option>
           </select>
         </div>
-        <div *ngIf="config.selectedEngine">
-          <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-3"
+        <div *ngIf="config.selectedEngine" #dropdownContainer class="relative">
+          <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
             ><span>Connectors</span
             ><app-info-tooltip
               class="inline-flex"
@@ -123,40 +123,56 @@
             ></app-info-tooltip
           ></label>
 
-          <div class="space-y-2">
-            <!-- Data Stores -->
-            <div
-              *ngFor="let ds of getSelectedEngine()?.dataStoreIds"
-              class="flex items-center justify-between p-2 bg-gray-50 rounded-md"
-            >
-              <span class="text-sm text-gray-700">{{ ds }}</span>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  class="sr-only peer"
-                  [checked]="isSelected(ds)"
-                  (change)="toggleDataStore(ds)"
-                />
-                <div
-                  class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"
-                ></div>
-              </label>
+          <!-- Dropdown Trigger -->
+          <button
+            type="button"
+            (click)="toggleDropdown()"
+            class="w-full p-2 border border-gray-300 rounded-md flex justify-between items-center text-sm bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <span class="text-gray-700 font-medium">{{ getSelectedConnectorsSummary() }}</span>
+            <svg class="w-4 h-4 text-gray-500 transition-transform" [ngClass]="{'rotate-180': isDropdownOpen}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          <!-- Dropdown Menu -->
+          <div
+            *ngIf="isDropdownOpen"
+            class="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg"
+          >
+            <!-- Search Input -->
+            <div class="p-2 border-b border-gray-200 bg-gray-50 rounded-t-md">
+              <input
+                type="text"
+                [(ngModel)]="connectorSearchQuery"
+                placeholder="Search connectors..."
+                class="w-full p-1.5 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                (click)="$event.stopPropagation()"
+              />
             </div>
 
-            <!-- Web Search -->
-            <div class="flex items-center justify-between p-2 bg-gray-50 rounded-md">
-              <span class="text-sm text-gray-700">Web Search</span>
-              <label class="relative inline-flex items-center cursor-pointer">
+            <!-- Options List -->
+            <div class="max-h-60 overflow-y-auto p-1.5 space-y-1">
+              <div
+                *ngFor="let option of filteredConnectors()"
+                class="flex items-center gap-2 p-1.5 hover:bg-blue-50 rounded cursor-pointer transition-colors"
+                (click)="toggleDataStore(option.id); $event.stopPropagation()"
+              >
                 <input
                   type="checkbox"
-                  class="sr-only peer"
-                  [checked]="isSelected('Web Search')"
-                  (change)="toggleDataStore('Web Search')"
+                  [id]="'connector-' + option.id"
+                  [checked]="isSelected(option.id)"
+                  (change)="toggleDataStore(option.id)"
+                  (click)="$event.stopPropagation()"
+                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
                 />
-                <div
-                  class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"
-                ></div>
-              </label>
+                <label [for]="'connector-' + option.id" class="text-sm text-gray-700 w-full cursor-pointer select-none">
+                  {{ option.label }}
+                </label>
+              </div>
+              <div *ngIf="filteredConnectors().length === 0" class="text-sm text-gray-500 p-3 text-center">
+                No connectors found.
+              </div>
             </div>
           </div>
         </div>
