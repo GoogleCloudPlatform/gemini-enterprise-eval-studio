@@ -64,6 +64,8 @@
     *ngIf="isProcessingGolden"
     [progress]="goldenProgress"
     [text]="'Generating responses... (' + completedRows + ' / ' + totalRows + ')'"
+    [canStop]="true"
+    (stop)="stopGoldenGeneration()"
   ></app-progress-bar>
 
   <!-- Results Table -->

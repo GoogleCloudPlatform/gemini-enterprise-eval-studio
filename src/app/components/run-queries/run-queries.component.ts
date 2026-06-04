@@ -124,10 +124,12 @@ export class RunQueriesComponent {
     this.cdr.detectChanges();
 
     for (let i = 0; i < this.goldenCsvRows.length; i++) {
+      if (!this.isProcessingGolden) break;
       const row = this.goldenCsvRows[i];
 
       const csvRow: any = {query: row['query']};
       const result = await this.evalService.processRow(csvRow);
+      if (!this.isProcessingGolden) break;
 
       this.goldenResults = [...this.goldenResults, {
         query: result.query,
@@ -147,6 +149,11 @@ export class RunQueriesComponent {
       this.cdr.detectChanges();
     }
 
+    this.isProcessingGolden = false;
+    this.cdr.detectChanges();
+  }
+
+  stopGoldenGeneration() {
     this.isProcessingGolden = false;
     this.cdr.detectChanges();
   }

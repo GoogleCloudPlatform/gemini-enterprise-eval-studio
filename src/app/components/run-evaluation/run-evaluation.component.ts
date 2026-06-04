@@ -142,6 +142,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     if (totalSteps === 0) return;
 
     for (let i = 0; i < event.rows.length; i++) {
+      if (!this.isProcessing) break;
       const row = event.rows[i];
 
       const result = await this.evalService.processRow(row, (step) => {
@@ -149,6 +150,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
         this.progress = Math.round((currentStep / totalSteps) * 100);
         this.cdr.detectChanges();
       });
+      if (!this.isProcessing) break;
 
       if (result.scoreError && !this.errorMessage) {
         this.errorMessage = `Scoring failed for some rows: ${result.scoreError}`;
@@ -160,7 +162,9 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
     }
 
-    this.progress = 100;
+    if (this.isProcessing) {
+      this.progress = 100;
+    }
     this.isProcessing = false;
     this.cdr.detectChanges();
   }
@@ -191,6 +195,12 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     const newResults: ResultRow[] = [];
 
     for (let i = 0; i < this.results.length; i++) {
+      if (!this.isProcessing) {
+        for (let j = i; j < this.results.length; j++) {
+          newResults.push(this.results[j]);
+        }
+        break;
+      }
       const row = this.results[i];
       this.progress = Math.round((i / this.totalRows) * 100);
       this.cdr.detectChanges();
@@ -209,6 +219,12 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
           break;
         }
       }
+      if (!this.isProcessing) {
+        for (let j = i; j < this.results.length; j++) {
+          newResults.push(this.results[j]);
+        }
+        break;
+      }
 
       newResults.push({
         ...row,
@@ -219,10 +235,16 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
     }
 
-    if (!this.errorMessage) {
+    if (!this.errorMessage && this.isProcessing) {
       this.progress = 100;
     }
     this.stateService.setResults(newResults);
+    this.isProcessing = false;
+    this.cdr.detectChanges();
+  }
+
+  /** Stops the current evaluation or re-rating process mid-way. */
+  stopEvaluation() {
     this.isProcessing = false;
     this.cdr.detectChanges();
   }

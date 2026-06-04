@@ -1,7 +1,16 @@
 <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200 max-w-2xl mx-auto mt-6">
-  <div class="flex justify-between mb-2">
+  <div class="flex justify-between items-center mb-2">
     <span class="text-sm font-medium text-gray-700">{{text}}</span>
-    <span class="text-sm font-medium text-blue-600">{{progress}}%</span>
+    <div class="flex items-center space-x-4">
+      <span class="text-sm font-medium text-blue-600">{{progress}}%</span>
+      <button
+        *ngIf="canStop"
+        (click)="stop.emit()"
+        class="bg-white border border-red-300 text-red-700 px-3 py-1 rounded-md hover:bg-red-50 transition-colors text-xs font-medium"
+      >
+        Stop
+      </button>
+    </div>
   </div>
   <div class="w-full bg-gray-200 rounded-full h-2.5">
     <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" [style.width.%]="progress"></div>

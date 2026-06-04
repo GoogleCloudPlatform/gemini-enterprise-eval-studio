@@ -108,6 +108,8 @@
     *ngIf="isProcessing"
     [progress]="progress"
     [text]="'Evaluating... (' + completedRows + ' / ' + totalRows + ')'"
+    [canStop]="true"
+    (stop)="stopEvaluation()"
   ></app-progress-bar>
 
   <!-- Re-rate Modal -->

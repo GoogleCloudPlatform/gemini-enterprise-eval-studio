@@ -15,7 +15,7 @@
  */
 
 import {CommonModule} from '@angular/common';
-import {Component, Input} from '@angular/core';
+import {Component, EventEmitter, Input, Output} from '@angular/core';
 
 /**
  * Component for displaying a progress bar with optional text.
@@ -29,4 +29,6 @@ import {Component, Input} from '@angular/core';
 export class ProgressBarComponent {
   @Input() progress = 0;
   @Input() text = '';
+  @Input() canStop = false;
+  @Output() stop = new EventEmitter<void>();
 }
