@@ -81,7 +81,7 @@ export class RunQueriesComponent {
       return this.isConfigValid();
     }
     if (targetStep === 3) {
-      return this.goldenResults.length > 0;
+      return this.goldenResults.length > 0 || this.isProcessingGolden;
     }
     return false;
   }
@@ -120,6 +120,8 @@ export class RunQueriesComponent {
     this.goldenProgress = 0;
     this.totalRows = this.goldenCsvRows.length;
     this.completedRows = 0;
+    this.step = 3;
+    this.cdr.detectChanges();
 
     for (let i = 0; i < this.goldenCsvRows.length; i++) {
       const row = this.goldenCsvRows[i];
@@ -146,7 +148,6 @@ export class RunQueriesComponent {
     }
 
     this.isProcessingGolden = false;
-    this.step = 3;
     this.cdr.detectChanges();
   }
 }

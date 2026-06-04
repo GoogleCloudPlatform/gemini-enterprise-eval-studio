@@ -98,7 +98,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       return this.isConfigValid();
     }
     if (targetStep === 3) {
-      return this.results.length > 0;
+      return this.results.length > 0 || this.isProcessing;
     }
     return false;
   }
@@ -130,6 +130,8 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     this.progress = 0;
     this.totalRows = event.rows.length;
     this.completedRows = 0;
+    this.step = 3;
+    this.stateService.setResults([]);
     this.cdr.detectChanges();
     const results: ResultRow[] = [];
 
@@ -153,14 +155,13 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       }
 
       results.push(result);
+      this.stateService.setResults(results);
       this.completedRows++;
       this.cdr.detectChanges();
     }
 
     this.progress = 100;
-    this.stateService.setResults(results);
     this.isProcessing = false;
-    this.step = 3;
     this.cdr.detectChanges();
   }
 

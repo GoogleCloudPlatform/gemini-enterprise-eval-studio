@@ -67,7 +67,7 @@
   ></app-progress-bar>
 
   <!-- Results Table -->
-  <div [hidden]="step !== 3 || goldenResults.length === 0">
+  <div [hidden]="step !== 3">
     <app-csv-table
       [data]="goldenResults"
       [columns]="columns"
