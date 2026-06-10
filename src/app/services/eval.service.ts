@@ -238,10 +238,9 @@ export class EvalService {
   async scoreResponse(
       query: string, response: string, golden: string,
       config: AppConfig): Promise<number> {
-    // TODO b/514571830 - Fix hardcoded auto-rater model.
     const url =
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${
-            config.geminiApiKey}`;
+        `https://generativelanguage.googleapis.com/v1beta/models/${
+            config.autoRaterModel}:generateContent?key=${config.geminiApiKey}`;
 
     const prompt = `${config.autoRaterInstruction}
 

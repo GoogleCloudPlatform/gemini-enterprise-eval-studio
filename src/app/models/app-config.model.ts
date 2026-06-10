@@ -24,6 +24,7 @@ export interface AppConfig {
   selectedEngine: string;
   selectedModel: string;
   geminiApiKey: string;
+  autoRaterModel: string;
   autoRaterInstruction: string;
   selectedDataStores: string[];
   enableWebSearch: boolean;

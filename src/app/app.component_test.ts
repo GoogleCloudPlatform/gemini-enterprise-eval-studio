@@ -39,6 +39,7 @@ describe('AppComponent', () => {
       selectedEngine: '',
       selectedModel: '',
       geminiApiKey: '',
+      autoRaterModel: 'gemini-1.5-flash',
       autoRaterInstruction: '',
       selectedDataStores: [],
       enableWebSearch: false
@@ -59,6 +60,7 @@ describe('AppComponent', () => {
       selectedEngine: '',
       selectedModel: '',
       geminiApiKey: '',
+      autoRaterModel: 'gemini-1.5-flash',
       autoRaterInstruction: '',
       selectedDataStores: [],
       enableWebSearch: false

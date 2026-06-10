@@ -37,6 +37,7 @@ describe('ConfigFormComponent', () => {
       selectedEngine: '',
       selectedModel: '',
       geminiApiKey: '',
+      autoRaterModel: '',
       autoRaterInstruction: '',
       selectedDataStores: [],
       enableWebSearch: false
@@ -53,6 +54,7 @@ describe('ConfigFormComponent', () => {
     mockStateService.getCurrentConfig.and.callFake(() => configSubject.value);
 
     mockHttpClient = jasmine.createSpyObj('HttpClient', ['get']);
+    mockHttpClient.get.and.returnValue(of({}));
 
     await TestBed
         .configureTestingModule({
@@ -245,6 +247,7 @@ describe('ConfigFormComponent', () => {
         selectedEngine: '',
         selectedModel: '',
         geminiApiKey: '',
+        autoRaterModel: 'gemini-1.5-flash',
         autoRaterInstruction: '',
         selectedDataStores: [],
         enableWebSearch: false
@@ -266,6 +269,7 @@ describe('ConfigFormComponent', () => {
            selectedEngine: 'engine',
            selectedModel: 'model',
            geminiApiKey: '',
+           autoRaterModel: 'gemini-1.5-flash',
            autoRaterInstruction: '',
            selectedDataStores: [],
            enableWebSearch: false
@@ -287,6 +291,7 @@ describe('ConfigFormComponent', () => {
            selectedEngine: 'engine',
            selectedModel: 'model',
            geminiApiKey: '',
+           autoRaterModel: 'gemini-1.5-flash',
            autoRaterInstruction: '',
            selectedDataStores: [],
            enableWebSearch: false
@@ -308,12 +313,35 @@ describe('ConfigFormComponent', () => {
            selectedEngine: 'engine',
            selectedModel: 'model',
            geminiApiKey: 'api-key',
+           autoRaterModel: 'gemini-1.5-flash',
            autoRaterInstruction: '',
            selectedDataStores: [],
            enableWebSearch: false
          };
 
          expect(component.canProceed()).toBeTruthy();
+       });
+
+    it('should return false if autoRaterModel is missing and isGetGolden is false',
+       () => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+         component.isGetGolden = false;
+
+         component.config = {
+           gCloudToken: 'token',
+           projectId: 'project',
+           region: 'global',
+           selectedEngine: 'engine',
+           selectedModel: 'model',
+           geminiApiKey: 'api-key',
+           autoRaterModel: '',
+           autoRaterInstruction: '',
+           selectedDataStores: [],
+           enableWebSearch: false
+         };
+
+         expect(component.canProceed()).toBeFalsy();
        });
   });
 
@@ -339,6 +367,49 @@ describe('ConfigFormComponent', () => {
 
       expect(mockStateService.setConfig).toHaveBeenCalledWith(component.config);
       expect(component.next.emit).toHaveBeenCalled();
+    });
+  });
+
+  describe('fetchAutoRaterModels', () => {
+    it('should fetch models successfully', async () => {
+      const fixture = TestBed.createComponent(ConfigFormComponent);
+      const component = fixture.componentInstance;
+      component.config.geminiApiKey = 'key';
+
+      const mockModelsResponse = {
+        models: [
+          { name: 'models/gemini-1.5-flash', supportedGenerationMethods: ['generateContent'] },
+          { name: 'models/gemini-1.5-pro', supportedGenerationMethods: ['generateContent'] },
+          { name: 'models/unsupported-model', supportedGenerationMethods: ['other'] }
+        ]
+      };
+
+      const spy = spyOn(globalThis, 'fetch').and.returnValue(
+          Promise.resolve(new Response(JSON.stringify(mockModelsResponse))));
+
+      await component.fetchAutoRaterModels();
+
+      expect(spy).toHaveBeenCalledWith(
+          'https://generativelanguage.googleapis.com/v1beta/models?key=key');
+      expect(component.autoRaterModels).toContain('gemini-1.5-flash');
+      expect(component.autoRaterModels).toContain('gemini-1.5-pro');
+      expect(component.autoRaterModels).not.toContain('unsupported-model');
+    });
+
+    it('should clear models and set error message on error', async () => {
+      const fixture = TestBed.createComponent(ConfigFormComponent);
+      const component = fixture.componentInstance;
+      component.config.geminiApiKey = 'key';
+      component.autoRaterModels = ['some-model'];
+      component.config.autoRaterModel = 'some-model';
+
+      spyOn(globalThis, 'fetch').and.returnValue(Promise.reject(new Error('API Error')));
+
+      await component.fetchAutoRaterModels();
+
+      expect(component.autoRaterModels.length).toBe(0);
+      expect(component.config.autoRaterModel).toBe('');
+      expect(component.autoRaterErrorMessage).toBe('Error fetching Gemini models. Please check your API key.');
     });
   });
 });

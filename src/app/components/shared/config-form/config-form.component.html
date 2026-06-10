@@ -196,10 +196,32 @@
           aria-label="Gemini API Key"
           [(ngModel)]="config.geminiApiKey"
           (ngModelChange)="onConfigChange()"
+          (blur)="fetchAutoRaterModels()"
           type="password"
           class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
           placeholder="AIzaSy..."
         />
+      </div>
+      <div>
+        <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+          ><span>Auto Rater Model</span
+          ><app-info-tooltip
+            class="inline-flex"
+            text="The Gemini model to use for auto-rating."
+          ></app-info-tooltip
+        ></label>
+        <select
+          aria-label="Auto Rater Model"
+          [(ngModel)]="config.autoRaterModel"
+          (ngModelChange)="onConfigChange()"
+          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          [disabled]="autoRaterModels.length === 0"
+        >
+          <option *ngFor="let m of autoRaterModels" [value]="m">{{ m }}</option>
+        </select>
+        <div *ngIf="autoRaterErrorMessage" class="mt-1 text-xs text-red-600">
+          {{ autoRaterErrorMessage }}
+        </div>
       </div>
       <div>
         <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"

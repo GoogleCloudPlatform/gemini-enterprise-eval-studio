@@ -51,10 +51,14 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     selectedEngine: '',
     selectedModel: '',
     geminiApiKey: '',
+    autoRaterModel: '',
     autoRaterInstruction: '',
     selectedDataStores: [],
     enableWebSearch: false
   };
+
+  autoRaterModels: string[] = [];
+  autoRaterErrorMessage = '';
 
   engines: Engine[] = [];
   models: string[] = [];
@@ -74,6 +78,9 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
           this.config = structuredClone(c);
           if (this.engines.length > 0) {
             this.updateModelsForSelectedEngine();
+          }
+          if (this.config.geminiApiKey) {
+            this.fetchAutoRaterModels();
           }
         });
 
@@ -160,6 +167,42 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
             this.cdr.detectChanges();
           }
         });
+  }
+
+  /**
+   * Fetches available Gemini models for the auto-rater.
+   */
+  async fetchAutoRaterModels() {
+    if (!this.config.geminiApiKey) {
+      return;
+    }
+    this.autoRaterErrorMessage = '';
+    const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${this.config.geminiApiKey}`;
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json() as {models: any[]};
+      if (data.models) {
+        this.autoRaterModels = data.models
+          .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+          .map(m => m.name.replace(/^models\//, ''));
+
+        if (this.autoRaterModels.length > 0 && (!this.config.autoRaterModel || !this.autoRaterModels.includes(this.config.autoRaterModel))) {
+          this.config.autoRaterModel = this.autoRaterModels[0];
+          this.onConfigChange();
+        }
+        this.cdr.detectChanges();
+      }
+    } catch (error) {
+      console.error('Error fetching Gemini models:', error);
+      this.autoRaterModels = [];
+      this.config.autoRaterModel = '';
+      this.autoRaterErrorMessage = 'Error fetching Gemini models. Please check your API key.';
+      this.onConfigChange();
+      this.cdr.detectChanges();
+    }
   }
 
   /**
@@ -298,7 +341,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     if (this.isGetGolden) {
       return baseValid;
     }
-    return baseValid && this.config.geminiApiKey;
+    return baseValid && this.config.geminiApiKey && this.config.autoRaterModel;
   }
 
   /**

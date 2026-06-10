@@ -37,6 +37,7 @@ describe('EvalService', () => {
       selectedEngine: 'engine',
       selectedModel: 'model',
       geminiApiKey: 'key',
+      autoRaterModel: 'gemini-1.5-flash',
       autoRaterInstruction: 'instructions',
       selectedDataStores: [],
       enableWebSearch: false
@@ -122,6 +123,7 @@ describe('EvalService', () => {
       selectedEngine: 'engine',
       selectedModel: 'model',
       geminiApiKey: 'key',
+      autoRaterModel: 'gemini-1.5-flash',
       autoRaterInstruction: 'instructions',
       selectedDataStores: [],
       enableWebSearch: false
@@ -146,6 +148,7 @@ describe('EvalService', () => {
       selectedEngine: 'engine',
       selectedModel: 'model',
       geminiApiKey: 'key',
+      autoRaterModel: 'gemini-1.5-flash',
       autoRaterInstruction: 'instructions',
       selectedDataStores: [],
       enableWebSearch: false

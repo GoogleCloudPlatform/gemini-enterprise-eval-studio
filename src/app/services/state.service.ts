@@ -40,6 +40,7 @@ export class StateService {
       selectedEngine: '',
       selectedModel: '',
       geminiApiKey: '',
+      autoRaterModel: '',
       autoRaterInstruction:
           'You are an expert evaluator. Compare the fetched response to the golden response for the given query. Calculate a semantic similarity score between 0.0 and 1.0...',
       selectedDataStores: [],

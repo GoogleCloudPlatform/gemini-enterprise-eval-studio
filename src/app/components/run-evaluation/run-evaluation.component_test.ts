@@ -17,7 +17,7 @@
 import {TestBed, fakeAsync, tick} from '@angular/core/testing';
 import {BehaviorSubject, of} from 'rxjs';
 
-import {AppConfig, Engine} from '../../models/app-config.model';
+import {AppConfig} from '../../models/app-config.model';
 import {ResultRow} from '../../models/result-row.model';
 import {EvalService} from '../../services/eval.service';
 import {StateService} from '../../services/state.service';
@@ -39,6 +39,7 @@ describe('RunEvaluationComponent', () => {
       selectedEngine: 'engine',
       selectedModel: 'model',
       geminiApiKey: 'apikey',
+      autoRaterModel: 'gemini-1.5-flash',
       autoRaterInstruction: '',
       selectedDataStores: [],
       enableWebSearch: false
