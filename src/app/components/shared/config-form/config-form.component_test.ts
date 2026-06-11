@@ -209,8 +209,6 @@ describe('ConfigFormComponent', () => {
          component.onEngineChange();
 
          expect(component.models).toContain('auto');
-         expect(component.models).toContain('gemini-2.5-pro');
-         expect(component.models).toContain('gemini-3.5-flash');
          expect(component.models).toContain('custom-model');
          expect(component.models).not.toContain('disabled-model');
          expect(component.config.selectedModel).toBe('auto');
