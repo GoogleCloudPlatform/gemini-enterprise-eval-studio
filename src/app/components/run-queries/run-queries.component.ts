@@ -58,6 +58,7 @@ export class RunQueriesComponent {
   goldenProgress = 0;
   totalRows = 0;
   completedRows = 0;
+  private currentRunId = 0;
 
   constructor(
       private csvService: CsvService, private evalService: EvalService,
@@ -115,6 +116,8 @@ export class RunQueriesComponent {
    * Runs the golden response generation process for all rows.
    */
   async runGoldenGeneration() {
+    if (this.isProcessingGolden) return;
+    const runId = ++this.currentRunId;
     this.isProcessingGolden = true;
     this.goldenResults = [];
     this.goldenProgress = 0;
@@ -124,7 +127,7 @@ export class RunQueriesComponent {
     this.cdr.detectChanges();
 
     for (let i = 0; i < this.goldenCsvRows.length; i++) {
-      if (!this.isProcessingGolden) break;
+      if (runId !== this.currentRunId || !this.isProcessingGolden) break;
       const row = this.goldenCsvRows[i];
 
       const csvRow: any = {query: row['query']};

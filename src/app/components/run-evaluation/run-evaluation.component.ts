@@ -55,6 +55,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
   reRateInstruction = '';
   errorMessage: string | null = null;
   private readonly destroy$ = new Subject<void>();
+  private currentRunId = 0;
 
   columns: ColumnDef[] = [
     {header: 'Query', key: 'query', truncate: true},
@@ -125,6 +126,8 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
    * @param event The event containing the file and parsed rows.
    */
   async startEvaluation(event: {file: File, rows: CSVRow[]}) {
+    if (this.isProcessing) return;
+    const runId = ++this.currentRunId;
     this.errorMessage = null;
     this.isProcessing = true;
     this.progress = 0;
@@ -142,7 +145,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     if (totalSteps === 0) return;
 
     for (let i = 0; i < event.rows.length; i++) {
-      if (!this.isProcessing) break;
+      if (runId !== this.currentRunId || !this.isProcessing) break;
       const row = event.rows[i];
 
       const result = await this.evalService.processRow(row, (step) => {
