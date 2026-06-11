@@ -5,7 +5,7 @@
       <span class="text-sm font-medium text-blue-600">{{progress}}%</span>
       <button
         *ngIf="canStop"
-        (click)="stop.emit()"
+        (click)="requestStop()"
         class="bg-white border border-red-300 text-red-700 px-3 py-1 rounded-md hover:bg-red-50 transition-colors text-xs font-medium"
       >
         Stop
@@ -14,5 +14,27 @@
   </div>
   <div class="w-full bg-gray-200 rounded-full h-2.5">
     <div class="bg-blue-600 h-2.5 rounded-full transition-all duration-300" [style.width.%]="progress"></div>
+  </div>
+</div>
+
+<!-- Stop Confirmation Modal -->
+<div *ngIf="showConfirmModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
+  <div class="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all max-w-md w-full p-6 space-y-4">
+    <h3 class="text-lg font-medium text-gray-900">Stop Processing</h3>
+    <p class="text-sm text-gray-500">Are you sure you want to stop the current process? Partial results will be kept.</p>
+    <div class="flex justify-end space-x-3">
+      <button
+        (click)="showConfirmModal = false"
+        class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
+      >
+        Cancel
+      </button>
+      <button
+        (click)="confirmStop()"
+        class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-colors font-medium"
+      >
+        Stop
+      </button>
+    </div>
   </div>
 </div>

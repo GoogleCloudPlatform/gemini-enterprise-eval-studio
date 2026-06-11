@@ -30,5 +30,16 @@ export class ProgressBarComponent {
   @Input() progress = 0;
   @Input() text = '';
   @Input() canStop = false;
-  @Output() stop = new EventEmitter<void>();
+  @Output() readonly stop = new EventEmitter<void>();
+
+  showConfirmModal = false;
+
+  requestStop() {
+    this.showConfirmModal = true;
+  }
+
+  confirmStop() {
+    this.showConfirmModal = false;
+    this.stop.emit();
+  }
 }
