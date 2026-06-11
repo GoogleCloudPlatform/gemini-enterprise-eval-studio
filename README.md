@@ -1,5 +1,9 @@
 # Gemini Enterprise Eval Studio
 
+<div align="center">
+  <img src="src/assets/logo.svg" alt="Gemini Enterprise Eval Studio Lockup" />
+</div>
+
 ## Overview
 
 Gemini Enterprise Eval Studio is an evaluation framework designed to execute

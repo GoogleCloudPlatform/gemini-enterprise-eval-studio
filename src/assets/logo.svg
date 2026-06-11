@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 90" width="600" height="90">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&amp;display=swap');
+    .brand-text {
+      font-family: 'Google Sans', 'Product Sans', sans-serif;
+      font-size: 30px;
+      dominant-baseline: central;
+    }
+    .title {
+      font-weight: 700;
+      fill: #1f2937;
+    }
+    .subtitle {
+      font-weight: 400;
+      fill: #6b7280;
+    }
+  </style>
+  <defs>
+    <linearGradient id="geminiSparkGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A73E8" />
+      <stop offset="35%" stop-color="#4285F4" />
+      <stop offset="60%" stop-color="#9B72CB" />
+      <stop offset="85%" stop-color="#D96570" />
+      <stop offset="100%" stop-color="#EA4335" />
+    </linearGradient>
+  </defs>
+  <g transform="matrix(0.35 0 0 0.35 15 11)">
+    <path d="M164.93,86.68c-13.56-5.84-25.42-13.84-35.6-24.01c-10.17-10.17-18.18-22.04-24.01-35.6c-2.24-5.2-4.04-10.54-5.42-16.02C99.45,9.26,97.85,8,96,8c-1.85,0-3.45,1.26-3.9,3.05c-1.38,5.48-3.18,10.81-5.42,16.02c-5.84,13.56-13.84,25.43-24.01,35.6C52.5,72.83,40.63,80.84,27.07,86.68c-5.2,2.24-10.54,4.04-16.02,5.42C9.26,92.55,8,94.15,8,96c0,1.85,1.26,3.45,3.05,3.9c5.48,1.38,10.81,3.18,16.02,5.42c13.56,5.84,25.42,13.84,35.6,24.01c10.17,10.17,18.18,22.04,24.01,35.6c2.24,5.2,4.04,10.54,5.42,16.02c0.45,1.79,2.06,3.05,3.9,3.05c1.85,0,3.45-1.26,3.9-3.05c1.38-5.48,3.18-10.81,5.42-16.02c5.84-13.56,13.84-25.42,24.01-35.6c10.17-10.17,22.04-18.18,35.6-24.01c5.2-2.24,10.54-4.04,16.02-5.42c1.79-0.45,3.05-2.06,3.05-3.9c0-1.85-1.26-3.45-3.05-3.9C175.47,90.72,170.14,88.92,164.93,86.68z" fill="url(#geminiSparkGrad)" />
+  </g>
+  <text x="95" y="45" class="brand-text title">Gemini Enterprise</text>
+  <text x="362" y="45" class="brand-text subtitle">Eval Studio</text>
+</svg>
