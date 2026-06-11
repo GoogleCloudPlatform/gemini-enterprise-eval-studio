@@ -15,8 +15,8 @@
  */
 
 import {Injectable} from '@angular/core';
-import {BehaviorSubject} from 'rxjs';
-import {map} from 'rxjs/operators';
+import {BehaviorSubject, Subject} from 'rxjs';
+import {debounceTime, map} from 'rxjs/operators';
 
 import {AppConfig, Engine} from '../models/app-config.model';
 import {ResultRow} from '../models/result-row.model';
@@ -31,6 +31,23 @@ export class StateService {
   currentTab$ = this.currentTabSubject.asObservable();
 
   private readonly STORAGE_KEY = 'ge_eval_studio_config';
+  private storageWrite$ = new Subject<any>();
+
+  constructor() {
+    // Debounce localStorage writes to prevent I/O blocking during rapid user
+    // input
+    this.storageWrite$.pipe(debounceTime(300)).subscribe(localConfig => {
+      if (typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(localConfig));
+        } catch (e) {
+          console.warn('localStorage write failed:', e);
+        }
+      }
+    });
+
+
+  }
 
   private loadInitialConfig(): AppConfig {
     const defaultConfig: AppConfig = {
@@ -101,15 +118,7 @@ export class StateService {
 
     const {gCloudToken, geminiApiKey, ...localConfig} = clonedConfig;
 
-    if (typeof localStorage !== 'undefined') {
-      try {
-        localStorage.setItem(this.STORAGE_KEY, JSON.stringify(localConfig));
-      } catch (e) {
-        console.warn(
-            'localStorage is available but could not be written (maybe blocked by sandbox/policy):',
-            e);
-      }
-    }
+    this.storageWrite$.next(localConfig);
   }
 
   /** Gets the current application configuration. */
