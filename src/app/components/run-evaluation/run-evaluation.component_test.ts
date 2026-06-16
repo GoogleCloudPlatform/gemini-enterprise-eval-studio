@@ -39,7 +39,7 @@ describe('RunEvaluationComponent', () => {
       selectedEngine: 'engine',
       selectedModel: 'model',
       geminiApiKey: 'apikey',
-      autoRaterModel: 'gemini-1.5-flash',
+      autoRaterModel: 'gemini-3.5-flash',
       autoRaterInstruction: '',
       selectedDataStores: [],
       enableWebSearch: false

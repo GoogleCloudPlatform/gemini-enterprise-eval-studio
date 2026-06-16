@@ -39,14 +39,14 @@ describe('AppComponent', () => {
       selectedEngine: '',
       selectedModel: '',
       geminiApiKey: '',
-      autoRaterModel: 'gemini-1.5-flash',
+      autoRaterModel: 'gemini-3.5-flash',
       autoRaterInstruction: '',
       selectedDataStores: [],
       enableWebSearch: false
     });
     enginesSubject = new BehaviorSubject<Engine[]>([]);
     mockStateService = jasmine.createSpyObj(
-        'StateService', ['getCurrentConfig', 'getEngines'], {
+        'StateService', ['getCurrentConfig', 'getEngines', 'setConfig'], {
           currentTab$: currentTabSubject.asObservable(),
           results$: resultsSubject.asObservable(),
           config$: configSubject.asObservable(),
@@ -60,7 +60,7 @@ describe('AppComponent', () => {
       selectedEngine: '',
       selectedModel: '',
       geminiApiKey: '',
-      autoRaterModel: 'gemini-1.5-flash',
+      autoRaterModel: 'gemini-3.5-flash',
       autoRaterInstruction: '',
       selectedDataStores: [],
       enableWebSearch: false

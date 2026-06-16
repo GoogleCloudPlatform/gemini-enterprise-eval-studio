@@ -259,7 +259,24 @@ export class EvalService {
     });
 
     if (!res.ok) {
-      throw new Error(`HTTP error! status: ${res.status}`);
+      let errorMessage = '';
+      try {
+        const errorData = await res.json();
+        errorMessage = errorData.error?.message || `HTTP error! status: ${res.status}`;
+      } catch (e) {
+        if (res.status === 403 || res.status === 401) {
+          errorMessage = 'Permission denied. Please check your Gemini API key.';
+        } else if (res.status === 404) {
+          errorMessage = `Model '${config.autoRaterModel}' not found or not available.`;
+        } else if (res.status === 429) {
+          errorMessage = 'Rate limit exceeded. Please try again later.';
+        } else if (res.status === 503) {
+          errorMessage = 'Service temporarily unavailable. Please try again later.';
+        } else {
+          errorMessage = `HTTP error! status: ${res.status}`;
+        }
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await res.json();

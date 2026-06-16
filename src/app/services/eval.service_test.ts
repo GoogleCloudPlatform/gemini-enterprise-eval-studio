@@ -37,7 +37,7 @@ describe('EvalService', () => {
       selectedEngine: 'engine',
       selectedModel: 'model',
       geminiApiKey: 'key',
-      autoRaterModel: 'gemini-1.5-flash',
+      autoRaterModel: 'gemini-3.5-flash',
       autoRaterInstruction: 'instructions',
       selectedDataStores: [],
       enableWebSearch: false
@@ -123,20 +123,75 @@ describe('EvalService', () => {
       selectedEngine: 'engine',
       selectedModel: 'model',
       geminiApiKey: 'key',
-      autoRaterModel: 'gemini-1.5-flash',
+      autoRaterModel: 'gemini-3.5-flash',
       autoRaterInstruction: 'instructions',
       selectedDataStores: [],
       enableWebSearch: false
     };
 
-    it('should throw an error if the response is not ok', async () => {
-      spyOn(globalThis, 'fetch').and.returnValue(Promise.resolve(new Response('', {
+    it('should throw generic error if response is not ok and JSON parsing fails', async () => {
+      spyOn(globalThis, 'fetch').and.returnValue(Promise.resolve(new Response('Not JSON', {
         status: 500,
         statusText: 'Internal Server Error'
       })));
 
       await expectAsync(service.scoreResponse('query', 'response', 'golden', config))
-          .toBeRejectedWithError(/HTTP error! status: 500/);
+          .toBeRejectedWithError('HTTP error! status: 500');
+    });
+
+    it('should throw detailed error message from JSON response if available', async () => {
+      const errorResponse = {
+        error: {
+          message: 'Detailed error from API'
+        }
+      };
+      spyOn(globalThis, 'fetch').and.returnValue(Promise.resolve(new Response(JSON.stringify(errorResponse), {
+        status: 400,
+        statusText: 'Bad Request'
+      })));
+
+      await expectAsync(service.scoreResponse('query', 'response', 'golden', config))
+          .toBeRejectedWithError('Detailed error from API');
+    });
+
+    it('should throw permission denied error for 403 status if JSON parsing fails', async () => {
+      spyOn(globalThis, 'fetch').and.returnValue(Promise.resolve(new Response('Not JSON', {
+        status: 403,
+        statusText: 'Forbidden'
+      })));
+
+      await expectAsync(service.scoreResponse('query', 'response', 'golden', config))
+          .toBeRejectedWithError('Permission denied. Please check your Gemini API key.');
+    });
+
+    it('should throw model not found error for 404 status if JSON parsing fails', async () => {
+      spyOn(globalThis, 'fetch').and.returnValue(Promise.resolve(new Response('Not JSON', {
+        status: 404,
+        statusText: 'Not Found'
+      })));
+
+      await expectAsync(service.scoreResponse('query', 'response', 'golden', config))
+          .toBeRejectedWithError(`Model 'gemini-3.5-flash' not found or not available.`);
+    });
+
+    it('should throw rate limit error for 429 status if JSON parsing fails', async () => {
+      spyOn(globalThis, 'fetch').and.returnValue(Promise.resolve(new Response('Not JSON', {
+        status: 429,
+        statusText: 'Too Many Requests'
+      })));
+
+      await expectAsync(service.scoreResponse('query', 'response', 'golden', config))
+          .toBeRejectedWithError('Rate limit exceeded. Please try again later.');
+    });
+
+    it('should throw service unavailable error for 503 status if JSON parsing fails', async () => {
+      spyOn(globalThis, 'fetch').and.returnValue(Promise.resolve(new Response('Not JSON', {
+        status: 503,
+        statusText: 'Service Unavailable'
+      })));
+
+      await expectAsync(service.scoreResponse('query', 'response', 'golden', config))
+          .toBeRejectedWithError('Service temporarily unavailable. Please try again later.');
     });
   });
 
@@ -148,7 +203,7 @@ describe('EvalService', () => {
       selectedEngine: 'engine',
       selectedModel: 'model',
       geminiApiKey: 'key',
-      autoRaterModel: 'gemini-1.5-flash',
+      autoRaterModel: 'gemini-3.5-flash',
       autoRaterInstruction: 'instructions',
       selectedDataStores: [],
       enableWebSearch: false
