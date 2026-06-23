@@ -18,6 +18,11 @@
 module.exports = function (config) {
   config.set({
     basePath: '',
+    hostname: '127.0.0.1',
+    listenAddress: '127.0.0.1',
+    browserNoActivityTimeout: 120000,
+    browserDisconnectTimeout: 120000,
+    captureTimeout: 120000,
     frameworks: ['jasmine', '@angular-devkit/build-angular'],
     plugins: [
       require('karma-jasmine'),
@@ -50,6 +55,17 @@ module.exports = function (config) {
     logLevel: config.LOG_INFO,
     autoWatch: true,
     browsers: ['Chrome'],
+    customLaunchers: {
+      ChromeHeadlessNoSandbox: {
+        base: 'ChromeHeadless',
+        flags: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-gpu',
+          '--disable-dev-shm-usage'
+        ]
+      }
+    },
     singleRun: false,
     restartOnFileChange: true
   });
