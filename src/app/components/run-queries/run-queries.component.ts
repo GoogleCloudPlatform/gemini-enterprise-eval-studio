@@ -25,6 +25,8 @@ import {ColumnDef, CsvTableComponent} from '../shared/csv-table/csv-table.compon
 import {FileUploadComponent} from '../shared/file-upload/file-upload.component';
 import {ProgressBarComponent} from '../shared/progress-bar/progress-bar.component';
 
+const MAX_CONCURRENT_REQUESTS_FOR_QUERIES = 5;
+
 /**
  * Component for running queries and generating responses.
  * It handles file upload, processing, and exporting results.
@@ -126,34 +128,52 @@ export class RunQueriesComponent {
     this.step = 3;
     this.cdr.detectChanges();
 
-    for (let i = 0; i < this.goldenCsvRows.length; i++) {
-      if (runId !== this.currentRunId || !this.isProcessingGolden) break;
-      const row = this.goldenCsvRows[i];
+    const tasks = this.goldenCsvRows.map(row => async () => {
+      if (runId !== this.currentRunId || !this.isProcessingGolden) return;
 
       const csvRow: any = {query: row['query']};
       const result = await this.evalService.processRow(csvRow);
-      if (!this.isProcessingGolden) break;
+      if (runId !== this.currentRunId || !this.isProcessingGolden) return;
 
-      this.goldenResults = [...this.goldenResults, {
-        query: result.query,
-        golden: result.fetched,
-        ttft: result.ttft,
-        tfuft: result.tfuft,
-        latency: result.latency,
-        assistToken: result.assistToken,
-        projectId: result.projectId,
-        region: result.region,
-        engineId: result.engineId
-      }];
+      this.goldenResults = [
+        ...this.goldenResults, {
+          query: result.query,
+          golden: result.fetched,
+          ttft: result.ttft,
+          tfuft: result.tfuft,
+          latency: result.latency,
+          assistToken: result.assistToken,
+          projectId: result.projectId,
+          region: result.region,
+          engineId: result.engineId
+        }
+      ];
 
       this.completedRows++;
       this.goldenProgress =
           Math.round((this.completedRows / this.totalRows) * 100);
       this.cdr.detectChanges();
-    }
+    });
 
-    this.isProcessingGolden = false;
-    this.cdr.detectChanges();
+    let index = 0;
+    const worker = async () => {
+      while (index < tasks.length) {
+        const currentIndex = index++;
+        await tasks[currentIndex]();
+      }
+    };
+
+    const workers = [];
+    for (let i = 0;
+         i < Math.min(MAX_CONCURRENT_REQUESTS_FOR_QUERIES, tasks.length); i++) {
+      workers.push(worker());
+    }
+    await Promise.all(workers);
+
+    if (runId === this.currentRunId) {
+      this.isProcessingGolden = false;
+      this.cdr.detectChanges();
+    }
   }
 
   stopGoldenGeneration() {
