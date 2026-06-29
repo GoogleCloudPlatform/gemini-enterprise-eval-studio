@@ -29,6 +29,8 @@ import {ColumnDef, CsvTableComponent} from '../shared/csv-table/csv-table.compon
 import {FileUploadComponent} from '../shared/file-upload/file-upload.component';
 import {ProgressBarComponent} from '../shared/progress-bar/progress-bar.component';
 
+const MAX_CONCURRENT_REQUESTS_FOR_EVALUATION = 5;
+
 /**
  * Container component for the Run Evaluation tab, managing steps and evaluation
  * process.
@@ -144,32 +146,45 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     const totalSteps = event.rows.length * stepsPerRow;
     if (totalSteps === 0) return;
 
-    for (let i = 0; i < event.rows.length; i++) {
-      if (runId !== this.currentRunId || !this.isProcessing) break;
-      const row = event.rows[i];
+    const tasks = event.rows.map(row => async () => {
+      if (runId !== this.currentRunId || !this.isProcessing) return;
 
-      const result = await this.evalService.processRow(row, (step) => {
-        const currentStep = i * stepsPerRow + (step === 'fetch' ? 0 : 1);
-        this.progress = Math.round((currentStep / totalSteps) * 100);
-        this.cdr.detectChanges();
-      });
-      if (!this.isProcessing) break;
+      const result = await this.evalService.processRow(row);
+      if (runId !== this.currentRunId || !this.isProcessing) return;
 
       if (result.scoreError && !this.errorMessage) {
-        this.errorMessage = `Scoring failed for some rows: ${result.scoreError}`;
+        this.errorMessage =
+            `Scoring failed for some rows: ${result.scoreError}`;
       }
 
       results.push(result);
       this.stateService.setResults(results);
       this.completedRows++;
+      this.progress = Math.round((this.completedRows / this.totalRows) * 100);
       this.cdr.detectChanges();
+    });
+
+    let index = 0;
+    const worker = async () => {
+      while (index < tasks.length) {
+        const currentIndex = index++;
+        await tasks[currentIndex]();
+      }
+    };
+
+    const workers = [];
+    for (let i = 0; i < Math.min(MAX_CONCURRENT_REQUESTS_FOR_EVALUATION, tasks.length); i++) {
+      workers.push(worker());
     }
+    await Promise.all(workers);
 
     if (this.isProcessing) {
       this.progress = 100;
     }
-    this.isProcessing = false;
-    this.cdr.detectChanges();
+    if (runId === this.currentRunId) {
+      this.isProcessing = false;
+      this.cdr.detectChanges();
+    }
   }
 
   /** Opens the re-rate modal and loads active instructions. */

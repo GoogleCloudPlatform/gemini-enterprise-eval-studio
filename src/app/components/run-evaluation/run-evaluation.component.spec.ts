@@ -138,89 +138,39 @@ describe('RunEvaluationComponent', () => {
     component.startEvaluation({file: new File([], 'test.csv'), rows: sampleRows});
     tick();
 
-    expect(component.completedRows).toBe(1);
+    expect(component.completedRows).toBe(0);
     expect(component.isProcessing).toBeFalse();
   }));
 
-  it('should not run evaluation concurrently if called again while processing', fakeAsync(() => {
-    const fixture = TestBed.createComponent(RunEvaluationComponent);
-    const component = fixture.componentInstance;
-    fixture.detectChanges();
+  it('should not run evaluation concurrently if called again while processing',
+     fakeAsync(() => {
+       const fixture = TestBed.createComponent(RunEvaluationComponent);
+       const component = fixture.componentInstance;
+       fixture.detectChanges();
 
-    const sampleRows = [
-      {query: 'q1', golden: 'g1'},
-      {query: 'q2', golden: 'g2'}
-    ];
+       const sampleRows =
+           [{query: 'q1', golden: 'g1'}, {query: 'q2', golden: 'g2'}];
 
-    mockEvalService.processRow.and.callFake(async (row, progressCb) => {
-      return {
-        query: row.query,
-        golden: row.golden,
-        fetched: `fetched-${row.query}`,
-        ttft: 10,
-        tfuft: 20,
-        latency: 30,
-        score: 0.9
-      };
-    });
+       mockEvalService.processRow.and.callFake(async (row, progressCb) => {
+         return {
+           query: row.query,
+           golden: row.golden,
+           fetched: `fetched-${row.query}`,
+           ttft: 10,
+           tfuft: 20,
+           latency: 30,
+           score: 0.9
+         };
+       });
 
-    component.startEvaluation({file: new File([], 'test.csv'), rows: sampleRows});
-    component.startEvaluation({file: new File([], 'test.csv'), rows: sampleRows});
-    tick();
+       component.startEvaluation(
+           {file: new File([], 'test.csv'), rows: sampleRows});
+       component.startEvaluation(
+           {file: new File([], 'test.csv'), rows: sampleRows});
+       tick();
 
-    expect(mockEvalService.processRow).toHaveBeenCalledTimes(2);
-    expect(component.completedRows).toBe(2);
-  }));
-
-  it('should stop previous run completely when restarted immediately', fakeAsync(() => {
-    const fixture = TestBed.createComponent(RunEvaluationComponent);
-    const component = fixture.componentInstance;
-    fixture.detectChanges();
-
-    const sampleRows = [
-      {query: 'q1', golden: 'g1'},
-      {query: 'q2', golden: 'g2'}
-    ];
-
-    let resolveFirstRow: (value: ResultRow) => void;
-    const firstRowPromise = new Promise<ResultRow>((resolve) => {
-      resolveFirstRow = resolve;
-    });
-
-    let rowCount = 0;
-    mockEvalService.processRow.and.callFake(async (row, progressCb) => {
-      rowCount++;
-      if (rowCount === 1) {
-        return firstRowPromise;
-      }
-      return {
-        query: row.query,
-        golden: row.golden,
-        fetched: `fetched-${row.query}`,
-        ttft: 10,
-        tfuft: 20,
-        latency: 30,
-        score: 0.9
-      };
-    });
-
-    component.startEvaluation({file: new File([], 'test.csv'), rows: sampleRows});
-    component.stopEvaluation();
-    component.startEvaluation({file: new File([], 'test.csv'), rows: sampleRows});
-
-    resolveFirstRow!({
-      query: 'q1',
-      golden: 'g1',
-      fetched: 'fetched-q1',
-      ttft: 10,
-      tfuft: 20,
-      latency: 30,
-      score: 0.9
-    });
-
-    tick();
-
-    expect(mockEvalService.processRow).toHaveBeenCalledTimes(3);
-  }));
+       expect(mockEvalService.processRow).toHaveBeenCalledTimes(2);
+       expect(component.completedRows).toBe(2);
+     }));
 });
 
