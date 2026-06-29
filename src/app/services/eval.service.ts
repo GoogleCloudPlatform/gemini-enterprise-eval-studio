@@ -183,7 +183,7 @@ export class EvalService {
 
       let score = 0;
       let scoreError: string | undefined;
-      if (config.geminiApiKey && row.golden) {
+      if (config.gCloudToken && row.golden) {
         onProgress?.('score');
         try {
           score =
@@ -238,9 +238,9 @@ export class EvalService {
   async scoreResponse(
       query: string, response: string, golden: string,
       config: AppConfig): Promise<number> {
-    const url =
-        `https://generativelanguage.googleapis.com/v1beta/models/${
-            config.autoRaterModel}:generateContent?key=${config.geminiApiKey}`;
+    const url = `https://aiplatform.googleapis.com/v1/projects/${
+        config.projectId}/locations/global/publishers/google/models/${
+        config.autoRaterModel}:generateContent`;
 
     const prompt = `${config.autoRaterInstruction}
 
@@ -250,11 +250,15 @@ export class EvalService {
 
     Provide only the score as a float between 0.0 and 1.0.`;
 
-    const body = {contents: [{parts: [{text: prompt}]}]};
+    const body = {contents: [{role: 'user', parts: [{text: prompt}]}]};
 
     const res = await fetch(url, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Authorization': `Bearer ${config.gCloudToken}`,
+        'x-goog-user-project': config.projectId,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(body)
     });
 

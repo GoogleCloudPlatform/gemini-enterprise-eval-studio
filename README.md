@@ -50,7 +50,12 @@ architecture:
 
 Before running the application, you will need the following:
 
-1.  **Google Cloud Access Token**: Obtain a temporary access token by running the following command in your terminal (you can open Cloud Shell using the terminal icon on the top right of the Google Cloud Console home page):
+
+1. **Enable Agent Platform API in your GCP project**: In the Google Cloud Console, navigate to "APIs & Services" > "Library", search for "Agent Platform API", and enable it.
+
+2. **Enable Discovery Engine API in your GCP project**: In the Google Cloud Console, navigate to "APIs & Services" > "Library", search for "Discovery Engine API", and enable it.
+
+3.  **Google Cloud Access Token**: Obtain a temporary access token by running the following command in your terminal (you can open Cloud Shell using the terminal icon on the top right of the Google Cloud Console home page):
 
     ```sh
     gcloud auth print-access-token
