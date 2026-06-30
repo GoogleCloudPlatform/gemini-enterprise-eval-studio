@@ -36,7 +36,6 @@ describe('ConfigFormComponent', () => {
       region: 'global',
       selectedEngine: '',
       selectedModel: '',
-      geminiApiKey: '',
       autoRaterModel: '',
       autoRaterInstruction: '',
       selectedDataStores: [],
@@ -244,7 +243,6 @@ describe('ConfigFormComponent', () => {
         region: 'global',
         selectedEngine: '',
         selectedModel: '',
-        geminiApiKey: '',
         autoRaterModel: 'gemini-3.1-pro-preview',
         autoRaterInstruction: '',
         selectedDataStores: [],
@@ -266,7 +264,6 @@ describe('ConfigFormComponent', () => {
            region: 'global',
            selectedEngine: 'engine',
            selectedModel: 'model',
-           geminiApiKey: '',
            autoRaterModel: 'gemini-3.1-pro-preview',
            autoRaterInstruction: '',
            selectedDataStores: [],
@@ -276,27 +273,6 @@ describe('ConfigFormComponent', () => {
          expect(component.canProceed()).toBeTruthy();
        });
 
-    it('should return false if geminiApiKey is missing and isGetGolden is false',
-       () => {
-         const fixture = TestBed.createComponent(ConfigFormComponent);
-         const component = fixture.componentInstance;
-         component.isGetGolden = false;
-
-         component.config = {
-           gCloudToken: 'token',
-           projectId: 'project',
-           region: 'global',
-           selectedEngine: 'engine',
-           selectedModel: 'model',
-           geminiApiKey: '',
-           autoRaterModel: 'gemini-3.1-pro-preview',
-           autoRaterInstruction: '',
-           selectedDataStores: [],
-           enableWebSearch: false
-         };
-
-         expect(component.canProceed()).toBeFalsy();
-       });
 
     it('should return true if all fields are present and isGetGolden is false',
        () => {
@@ -310,7 +286,6 @@ describe('ConfigFormComponent', () => {
            region: 'global',
            selectedEngine: 'engine',
            selectedModel: 'model',
-           geminiApiKey: 'api-key',
            autoRaterModel: 'gemini-3.1-pro-preview',
            autoRaterInstruction: '',
            selectedDataStores: [],
@@ -332,7 +307,6 @@ describe('ConfigFormComponent', () => {
            region: 'global',
            selectedEngine: 'engine',
            selectedModel: 'model',
-           geminiApiKey: 'api-key',
            autoRaterModel: '',
            autoRaterInstruction: '',
            selectedDataStores: [],
@@ -388,26 +362,26 @@ describe('ConfigFormComponent', () => {
       expect(mockStateService.setConfig).toHaveBeenCalled();
     });
 
-    it('should not overwrite autoRaterModel if it is already a valid model', () => {
-      configSubject.next({
-        gCloudToken: '',
-        projectId: '',
-        region: 'global',
-        selectedEngine: '',
-        selectedModel: '',
-        geminiApiKey: '',
-        autoRaterModel: 'gemini-3.5-flash',
-        autoRaterInstruction: '',
-        selectedDataStores: [],
-        enableWebSearch: false
-      });
+    it('should not overwrite autoRaterModel if it is already a valid model',
+       () => {
+         configSubject.next({
+           gCloudToken: '',
+           projectId: '',
+           region: 'global',
+           selectedEngine: '',
+           selectedModel: '',
+           autoRaterModel: 'gemini-3.5-flash',
+           autoRaterInstruction: '',
+           selectedDataStores: [],
+           enableWebSearch: false
+         });
 
-      const fixture = TestBed.createComponent(ConfigFormComponent);
-      const component = fixture.componentInstance;
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
 
-      fixture.detectChanges();
+         fixture.detectChanges();
 
-      expect(component.config.autoRaterModel).toBe('gemini-3.5-flash');
-    });
+         expect(component.config.autoRaterModel).toBe('gemini-3.5-flash');
+       });
   });
 });

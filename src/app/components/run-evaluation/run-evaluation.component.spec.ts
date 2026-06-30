@@ -38,7 +38,6 @@ describe('RunEvaluationComponent', () => {
       region: 'global',
       selectedEngine: 'engine',
       selectedModel: 'model',
-      geminiApiKey: 'apikey',
       autoRaterModel: 'gemini-3.5-flash',
       autoRaterInstruction: '',
       selectedDataStores: [],

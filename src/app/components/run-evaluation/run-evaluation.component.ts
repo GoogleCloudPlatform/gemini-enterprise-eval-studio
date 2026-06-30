@@ -89,8 +89,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     const hasValidEngine = engines.some(e => e.name === config.selectedEngine);
     return !!(config.gCloudToken && config.projectId &&
         config.selectedEngine && config.selectedModel &&
-        hasValidEngine &&
-        config.geminiApiKey);
+        hasValidEngine);
   }
 
   isStepSelectable(targetStep: number): boolean {
@@ -140,11 +139,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     this.cdr.detectChanges();
     const results: ResultRow[] = [];
 
-    const config = this.stateService.getCurrentConfig();
-    const hasScoreStep = !!config.geminiApiKey;
-    const stepsPerRow = hasScoreStep ? 2 : 1;
-    const totalSteps = event.rows.length * stepsPerRow;
-    if (totalSteps === 0) return;
+    if (this.totalRows === 0) return;
 
     const tasks = event.rows.map(row => async () => {
       if (runId !== this.currentRunId || !this.isProcessing) return;
@@ -224,7 +219,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
 
       let score = 0;
-      if (config.geminiApiKey && row.golden && row.fetched) {
+      if (row.golden && row.fetched) {
         try {
           score = await this.evalService.scoreResponse(
               row.query, row.fetched, row.golden, config);

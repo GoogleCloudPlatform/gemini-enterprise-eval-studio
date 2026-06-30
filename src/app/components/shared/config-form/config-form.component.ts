@@ -50,7 +50,6 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     region: 'global',
     selectedEngine: '',
     selectedModel: '',
-    geminiApiKey: '',
     autoRaterModel: '',
     autoRaterInstruction: '',
     selectedDataStores: [],
@@ -306,7 +305,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     if (this.isGetGolden) {
       return baseValid;
     }
-    return baseValid && this.config.geminiApiKey && this.config.autoRaterModel;
+    return baseValid && this.config.autoRaterModel;
   }
 
   /**

@@ -56,7 +56,6 @@ export class StateService {
       region: 'global',
       selectedEngine: '',
       selectedModel: '',
-      geminiApiKey: '',
       autoRaterModel: '',
       autoRaterInstruction:
           'You are an expert evaluator. Compare the fetched response to the golden response for the given query. Calculate a semantic similarity score between 0.0 and 1.0...',
@@ -79,13 +78,12 @@ export class StateService {
       }
     }
 
-    const {gCloudToken, geminiApiKey, ...safeConfig} = savedConfig;
+    const {gCloudToken, ...safeConfig} = savedConfig;
 
     return {
       ...defaultConfig,
       ...safeConfig,
       gCloudToken: '',
-      geminiApiKey: '',
     };
   }
 
@@ -116,7 +114,7 @@ export class StateService {
     const clonedConfig = structuredClone(config);
     this.configSubject.next(clonedConfig);
 
-    const {gCloudToken, geminiApiKey, ...localConfig} = clonedConfig;
+    const {gCloudToken, ...localConfig} = clonedConfig;
 
     this.storageWrite$.next(localConfig);
   }
