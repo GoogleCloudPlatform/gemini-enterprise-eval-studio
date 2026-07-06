@@ -78,12 +78,15 @@ export class StateService {
       }
     }
 
-    const {gCloudToken, ...safeConfig} = savedConfig;
+    const {gCloudToken, selectedEngine, selectedModel, ...safeConfig} =
+        savedConfig;
 
     return {
       ...defaultConfig,
       ...safeConfig,
       gCloudToken: '',
+      selectedEngine: '',
+      selectedModel: '',
     };
   }
 
@@ -114,7 +117,8 @@ export class StateService {
     const clonedConfig = structuredClone(config);
     this.configSubject.next(clonedConfig);
 
-    const {gCloudToken, ...localConfig} = clonedConfig;
+    const {gCloudToken, selectedEngine, selectedModel, ...localConfig} =
+        clonedConfig;
 
     this.storageWrite$.next(localConfig);
   }
