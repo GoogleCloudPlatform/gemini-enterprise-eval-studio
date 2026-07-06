@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import {HttpClientTestingModule} from '@angular/common/http/testing';
 import {TestBed, fakeAsync, tick} from '@angular/core/testing';
 import {BehaviorSubject, of} from 'rxjs';
 
@@ -61,7 +62,7 @@ describe('RunEvaluationComponent', () => {
 
     await TestBed
         .configureTestingModule({
-          imports: [RunEvaluationComponent],
+          imports: [RunEvaluationComponent, HttpClientTestingModule],
           providers: [
             {provide: StateService, useValue: mockStateService},
             {provide: EvalService, useValue: mockEvalService}
