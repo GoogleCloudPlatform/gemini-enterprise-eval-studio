@@ -52,9 +52,9 @@
 
     <h3 class="text-lg font-medium mt-4 mb-2 text-gray-800">3. Metric Definitions</h3>
     <ul class="list-disc pl-5 mb-4 text-gray-700 space-y-2">
-      <li><strong>TTFT (Time to First Token)</strong>: Latency until the first chunk of data (text or thought) is received from the model.</li>
-      <li><strong>TFUFT (Time to First User Facing Token)</strong>: Latency until the first actual text response (excluding internal chain-of-thought) is received.</li>
-      <li><strong>Latency</strong>: Total time taken for the entire response to stream.</li>
+      <li><strong>TTFT (s) (Time to First Token)</strong>: Latency in seconds until the first chunk of data (text or thought) is received from the model.</li>
+      <li><strong>TTFA (s) (Time To First Answer Token)</strong>: Latency in seconds until the first actual text response (excluding internal chain-of-thought) is received.</li>
+      <li><strong>TTLT (s) (Time To Last Token)</strong>: Total time in seconds taken for the entire response to stream.</li>
       <li><strong>Score</strong>: A score (0.0 to 1.0) calculated by Gemini based on your defined rubrics or metrics, comparing the fetched response to your golden response.</li>
     </ul>
 

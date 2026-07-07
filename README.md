@@ -9,7 +9,7 @@
 Gemini Enterprise Eval Studio is an evaluation framework designed to execute
 stateless API calls against Gemini Enterprise for E2E evaluation.
 It enables customers to run batch evaluations, compare baselines, measure
-streaming latency metrics (TTFT, TFUFT, Grounding Latency, Tool Execution
+streaming latency metrics (TTFT, TTFA, TTLT, Grounding Latency, Tool Execution
 Latency), and define custom metrics using auto-grader rubrics or programmatic
 evaluators.
 
@@ -26,7 +26,7 @@ violate data privacy policies.
 -   **Client-Side Stateless Execution**: Direct API communication using end-user
     tokens, ensuring data privacy.
 -   **Latency Telemetry Capture**: Calculate and expose Time to First Token
-    (TTFT), Time to First User Facing Token (TFUFT), and total latency.
+    (TTFT), Time To First Answer Token (TTFA), and Time To Last Token (TTLT) in seconds (s).
 -   **Dual Metric Definition**: Support for both LLM-as-a-Judge rubrics and
     programmatic evaluator modules.
 

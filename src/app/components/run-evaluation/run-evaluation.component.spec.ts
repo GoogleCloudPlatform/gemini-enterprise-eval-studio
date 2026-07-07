@@ -93,8 +93,8 @@ describe('RunEvaluationComponent', () => {
         golden: row.golden,
         fetched: `fetched-${row.query}`,
         ttft: 10,
-        tfuft: 20,
-        latency: 30,
+        ttfa: 20,
+        ttlt: 30,
         score: 0.9
       };
     });
@@ -129,8 +129,8 @@ describe('RunEvaluationComponent', () => {
         golden: row.golden,
         fetched: `fetched-${row.query}`,
         ttft: 10,
-        tfuft: 20,
-        latency: 30,
+        ttfa: 20,
+        ttlt: 30,
         score: 0.9
       };
     });
@@ -157,8 +157,8 @@ describe('RunEvaluationComponent', () => {
            golden: row.golden,
            fetched: `fetched-${row.query}`,
            ttft: 10,
-           tfuft: 20,
-           latency: 30,
+           ttfa: 20,
+           ttlt: 30,
            score: 0.9
          };
        });

@@ -49,9 +49,9 @@ export class RunQueriesComponent {
       type: 'markdown',
       truncate: true
     },
-    {header: 'TTFT', key: 'ttft', type: 'number'},
-    {header: 'TFUFT', key: 'tfuft', type: 'number'},
-    {header: 'Latency', key: 'latency', type: 'number'}
+    {header: 'TTFT (s)', key: 'ttft', type: 'number'},
+    {header: 'TTFA (s)', key: 'ttfa', type: 'number'},
+    {header: 'TTLT (s)', key: 'ttlt', type: 'number'}
   ];
   responseFile: File|null = null;
   responseCsvRows: Array<Record<string, string>> = [];
@@ -140,8 +140,8 @@ export class RunQueriesComponent {
           query: result.query,
           response: result.fetched,
           ttft: result.ttft,
-          tfuft: result.tfuft,
-          latency: result.latency,
+          ttfa: result.ttfa,
+          ttlt: result.ttlt,
           assistToken: result.assistToken,
           projectId: result.projectId,
           region: result.region,

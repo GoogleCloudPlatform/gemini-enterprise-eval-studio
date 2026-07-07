@@ -76,7 +76,7 @@ export class EvalService {
 
     const startTime = Date.now();
     let ttft = 0;
-    let tfuft = 0;
+    let ttfa = 0;
     let fullText = '';
     let assistToken = '';
     let isFirstChunk = true;
@@ -162,7 +162,7 @@ export class EvalService {
                     }
 
                     if (!thought && text && isFirstUserChunk) {
-                      tfuft = Date.now() - startTime;
+                      ttfa = Date.now() - startTime;
                       isFirstUserChunk = false;
                     }
 
@@ -179,7 +179,7 @@ export class EvalService {
         }
       }
 
-      const latency = Date.now() - startTime;
+      const ttlt = Date.now() - startTime;
 
       let score = 0;
       let scoreError: string | undefined;
@@ -198,9 +198,9 @@ export class EvalService {
         query: row.query,
         golden: row.golden || '',
         fetched: fullText,
-        ttft,
-        tfuft,
-        latency,
+        ttft: Number((ttft / 1000).toFixed(2)),
+        ttfa: Number((ttfa / 1000).toFixed(2)),
+        ttlt: Number((ttlt / 1000).toFixed(2)),
         score,
         assistToken,
         projectId,
@@ -216,8 +216,8 @@ export class EvalService {
         golden: row.golden || '',
         fetched: 'Error: ' + error,
         ttft: 0,
-        tfuft: 0,
-        latency: 0,
+        ttfa: 0,
+        ttlt: 0,
         score: 0,
         assistToken,
         projectId,

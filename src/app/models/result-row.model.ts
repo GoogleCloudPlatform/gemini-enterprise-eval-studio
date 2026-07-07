@@ -21,11 +21,12 @@ export interface ResultRow {
   query: string;
   golden: string;
   fetched: string;
-  /** Time to First Token. */
+  /** Time to First Token in seconds (s). */
   ttft: number;
-  /** Time to First User Facing Token. */
-  tfuft: number;
-  latency: number;
+  /** Time to First Answer Token in seconds (s). */
+  ttfa: number;
+  /** Time to Last Token in seconds (s). */
+  ttlt: number;
   score: number;
   assistToken?: string;
   projectId?: string;

@@ -63,9 +63,9 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     {header: 'Query', key: 'query', truncate: true},
     {header: 'Golden', key: 'golden', truncate: true},
     {header: 'Fetched', key: 'fetched', type: 'markdown', truncate: true},
-    {header: 'TTFT', key: 'ttft', type: 'number'},
-    {header: 'TFUFT', key: 'tfuft', type: 'number'},
-    {header: 'Latency', key: 'latency', type: 'number'},
+    {header: 'TTFT (s)', key: 'ttft', type: 'number'},
+    {header: 'TTFA (s)', key: 'ttfa', type: 'number'},
+    {header: 'TTLT (s)', key: 'ttlt', type: 'number'},
     {header: 'Score', key: 'score', type: 'score'}
   ];
 
