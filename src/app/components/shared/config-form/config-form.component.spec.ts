@@ -230,6 +230,65 @@ describe('ConfigFormComponent', () => {
 
          expect(component.config.selectedDataStores).toEqual(['ds1']);
        });
+
+    it('should include gemini-2.5-pro and gemini-3.5-flash as fallbacks if they are not in modelConfigs',
+       () => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+
+         component.engines = [{
+           name: 'engine1',
+           displayName: 'Engine 1',
+           modelConfigs: {}
+         }];
+         component.config.selectedEngine = 'engine1';
+
+         component.onEngineChange();
+
+         expect(component.models).toContain('auto');
+         expect(component.models).toContain('gemini-2.5-pro');
+         expect(component.models).toContain('gemini-3.5-flash');
+       });
+
+    it('should not add fallback model if it is in modelConfigs as MODEL_DISABLED',
+       () => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+
+         component.engines = [{
+           name: 'engine1',
+           displayName: 'Engine 1',
+           modelConfigs: {
+             'gemini-2.5-pro': 'MODEL_DISABLED'
+           }
+         }];
+         component.config.selectedEngine = 'engine1';
+
+         component.onEngineChange();
+
+         expect(component.models).not.toContain('gemini-2.5-pro');
+         expect(component.models).toContain('gemini-3.5-flash');
+       });
+
+    it('should not duplicate fallback model if it is already in modelConfigs as MODEL_ENABLED',
+       () => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+
+         component.engines = [{
+           name: 'engine1',
+           displayName: 'Engine 1',
+           modelConfigs: {
+             'gemini-2.5-pro': 'MODEL_ENABLED'
+           }
+         }];
+         component.config.selectedEngine = 'engine1';
+
+         component.onEngineChange();
+
+         const proOccurrences = component.models.filter(m => m === 'gemini-2.5-pro').length;
+         expect(proOccurrences).toBe(1);
+       });
   });
 
   describe('canProceed', () => {
