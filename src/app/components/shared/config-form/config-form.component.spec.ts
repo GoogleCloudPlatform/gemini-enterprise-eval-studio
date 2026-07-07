@@ -252,11 +252,11 @@ describe('ConfigFormComponent', () => {
       expect(component.canProceed()).toBeFalsy();
     });
 
-    it('should return true if base fields are present and isGetGolden is true',
+    it('should return true if base fields are present and isRunQueries is true',
        () => {
          const fixture = TestBed.createComponent(ConfigFormComponent);
          const component = fixture.componentInstance;
-         component.isGetGolden = true;
+         component.isRunQueries = true;
 
          component.config = {
            gCloudToken: 'token',
@@ -274,11 +274,11 @@ describe('ConfigFormComponent', () => {
        });
 
 
-    it('should return true if all fields are present and isGetGolden is false',
+    it('should return true if all fields are present and isRunQueries is false',
        () => {
          const fixture = TestBed.createComponent(ConfigFormComponent);
          const component = fixture.componentInstance;
-         component.isGetGolden = false;
+         component.isRunQueries = false;
 
          component.config = {
            gCloudToken: 'token',
@@ -295,11 +295,11 @@ describe('ConfigFormComponent', () => {
          expect(component.canProceed()).toBeTruthy();
        });
 
-    it('should return false if autoRaterModel is missing and isGetGolden is false',
+    it('should return false if autoRaterModel is missing and isRunQueries is false',
        () => {
          const fixture = TestBed.createComponent(ConfigFormComponent);
          const component = fixture.componentInstance;
-         component.isGetGolden = false;
+         component.isRunQueries = false;
 
          component.config = {
            gCloudToken: 'token',

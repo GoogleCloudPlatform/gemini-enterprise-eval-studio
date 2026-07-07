@@ -43,16 +43,16 @@
 
   <!-- Configuration Form -->
   <div [hidden]="step !== 1">
-    <app-config-form [isGetGolden]="true" (next)="nextStep()"></app-config-form>
+    <app-config-form [isRunQueries]="true" (next)="nextStep()"></app-config-form>
   </div>
 
   <!-- File Upload -->
   <div [hidden]="step !== 2">
     <app-file-upload
-      [(file)]="goldenFile"
-      [(csvRows)]="goldenCsvRows"
+      [(file)]="responseFile"
+      [(csvRows)]="responseCsvRows"
       (prev)="prevStep()"
-      (run)="startGoldenGeneration($event)"
+      (run)="startResponseGeneration($event)"
       [instruction]="'CSV file with at least \'query\' column'"
       [buttonText]="'Run Queries'"
       [requiredColumns]="['query']"
@@ -61,17 +61,17 @@
 
   <!-- Progress Bar -->
   <app-progress-bar
-    *ngIf="isProcessingGolden"
-    [progress]="goldenProgress"
+    *ngIf="isProcessingResponse"
+    [progress]="responseProgress"
     [text]="'Generating responses... (' + completedRows + ' / ' + totalRows + ')'"
     [canStop]="true"
-    (stop)="stopGoldenGeneration()"
+    (stop)="stopResponseGeneration()"
   ></app-progress-bar>
 
   <!-- Results Table -->
   <div [hidden]="step !== 3">
     <app-csv-table
-      [data]="goldenResults"
+      [data]="responseResults"
       [columns]="columns"
       [title]="'Query Results'"
       [exportFileName]="'query_results'"

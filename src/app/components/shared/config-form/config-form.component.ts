@@ -41,7 +41,7 @@ interface EnginesResponse {
 export class ConfigFormComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   @Output() readonly next = new EventEmitter<void>();
-  @Input() isGetGolden = false;
+  @Input() isRunQueries = false;
   @ViewChild('dropdownContainer') dropdownContainer?: ElementRef;
 
   config: AppConfig = {
@@ -302,7 +302,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   canProceed() {
     const baseValid = this.config.gCloudToken && this.config.projectId &&
         this.config.selectedEngine && this.config.selectedModel;
-    if (this.isGetGolden) {
+    if (this.isRunQueries) {
       return baseValid;
     }
     return baseValid && this.config.autoRaterModel;

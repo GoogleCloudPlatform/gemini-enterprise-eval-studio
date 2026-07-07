@@ -45,7 +45,7 @@ export class RunQueriesComponent {
   columns: ColumnDef[] = [
     {header: 'Query', key: 'query', truncate: true}, {
       header: 'Response',
-      key: 'golden',
+      key: 'response',
       type: 'markdown',
       truncate: true
     },
@@ -53,11 +53,11 @@ export class RunQueriesComponent {
     {header: 'TFUFT', key: 'tfuft', type: 'number'},
     {header: 'Latency', key: 'latency', type: 'number'}
   ];
-  goldenFile: File|null = null;
-  goldenCsvRows: Array<Record<string, string>> = [];
-  goldenResults: any[] = [];
-  isProcessingGolden = false;
-  goldenProgress = 0;
+  responseFile: File|null = null;
+  responseCsvRows: Array<Record<string, string>> = [];
+  responseResults: any[] = [];
+  isProcessingResponse = false;
+  responseProgress = 0;
   totalRows = 0;
   completedRows = 0;
   private currentRunId = 0;
@@ -84,7 +84,7 @@ export class RunQueriesComponent {
       return this.isConfigValid();
     }
     if (targetStep === 3) {
-      return this.goldenResults.length > 0 || this.isProcessingGolden;
+      return this.responseResults.length > 0 || this.isProcessingResponse;
     }
     return false;
   }
@@ -108,37 +108,37 @@ export class RunQueriesComponent {
     }
   }
 
-  startGoldenGeneration(event: {file: File, rows: any[]}) {
-    this.goldenFile = event.file;
-    this.goldenCsvRows = event.rows;
-    this.runGoldenGeneration();
+  startResponseGeneration(event: {file: File, rows: any[]}) {
+    this.responseFile = event.file;
+    this.responseCsvRows = event.rows;
+    this.runResponseGeneration();
   }
 
   /**
-   * Runs the golden response generation process for all rows.
+   * Runs the response generation process for all rows.
    */
-  async runGoldenGeneration() {
-    if (this.isProcessingGolden) return;
+  async runResponseGeneration() {
+    if (this.isProcessingResponse) return;
     const runId = ++this.currentRunId;
-    this.isProcessingGolden = true;
-    this.goldenResults = [];
-    this.goldenProgress = 0;
-    this.totalRows = this.goldenCsvRows.length;
+    this.isProcessingResponse = true;
+    this.responseResults = [];
+    this.responseProgress = 0;
+    this.totalRows = this.responseCsvRows.length;
     this.completedRows = 0;
     this.step = 3;
     this.cdr.detectChanges();
 
-    const tasks = this.goldenCsvRows.map(row => async () => {
-      if (runId !== this.currentRunId || !this.isProcessingGolden) return;
+    const tasks = this.responseCsvRows.map(row => async () => {
+      if (runId !== this.currentRunId || !this.isProcessingResponse) return;
 
       const csvRow: any = {query: row['query']};
       const result = await this.evalService.processRow(csvRow);
-      if (runId !== this.currentRunId || !this.isProcessingGolden) return;
+      if (runId !== this.currentRunId || !this.isProcessingResponse) return;
 
-      this.goldenResults = [
-        ...this.goldenResults, {
+      this.responseResults = [
+        ...this.responseResults, {
           query: result.query,
-          golden: result.fetched,
+          response: result.fetched,
           ttft: result.ttft,
           tfuft: result.tfuft,
           latency: result.latency,
@@ -150,7 +150,7 @@ export class RunQueriesComponent {
       ];
 
       this.completedRows++;
-      this.goldenProgress =
+      this.responseProgress =
           Math.round((this.completedRows / this.totalRows) * 100);
       this.cdr.detectChanges();
     });
@@ -171,13 +171,13 @@ export class RunQueriesComponent {
     await Promise.all(workers);
 
     if (runId === this.currentRunId) {
-      this.isProcessingGolden = false;
+      this.isProcessingResponse = false;
       this.cdr.detectChanges();
     }
   }
 
-  stopGoldenGeneration() {
-    this.isProcessingGolden = false;
+  stopResponseGeneration() {
+    this.isProcessingResponse = false;
     this.cdr.detectChanges();
   }
 }
