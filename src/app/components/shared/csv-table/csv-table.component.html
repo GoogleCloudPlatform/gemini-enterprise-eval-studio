@@ -68,9 +68,9 @@
             <div *ngIf="col.type === 'score'" class="font-medium">
               <span
                 [ngClass]="{
-                  'text-green-600': row[col.key] >= 0.8,
-                  'text-yellow-600': row[col.key] >= 0.5 && row[col.key] < 0.8,
-                  'text-red-600': row[col.key] < 0.5,
+                  'text-green-600': (row[col.key] >= 0.8),
+                  'text-yellow-600': (row[col.key] >= 0.5 && row[col.key] < 0.8),
+                  'text-red-600': (row[col.key] < 0.5)
                 }"
               >
                 {{ row[col.key] }}
@@ -81,9 +81,9 @@
             <div *ngIf="col.type === 'delta'" class="font-medium">
               <span
                 [ngClass]="{
-                  'text-green-600': row[col.key] > 0.1,
-                  'text-red-600': row[col.key] < -0.1,
-                  'text-gray-600': row[col.key] >= -0.1 && row[col.key] <= 0.1,
+                  'text-green-600': (row[col.key] > 0.1),
+                  'text-red-600': (row[col.key] < -0.1),
+                  'text-gray-600': (row[col.key] >= -0.1 && row[col.key] <= 0.1)
                 }"
               >
                 {{ row[col.key] > 0 ? "+" : "" }}{{ row[col.key] }}
