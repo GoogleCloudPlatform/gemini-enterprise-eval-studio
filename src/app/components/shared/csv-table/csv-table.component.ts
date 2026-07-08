@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {CommonModule} from '@angular/common';
+import {CommonModule, formatDate} from '@angular/common';
 import {Component, Input} from '@angular/core';
 
 import {CsvService} from '../../../services/csv.service';
@@ -53,8 +53,11 @@ export class CsvTableComponent {
    * Exports the table data to a CSV file.
    */
   exportResults() {
+    const formattedDate =
+        formatDate(new Date(), 'yyyy-MM-dd_HH-mm-ss', 'en-US');
+
     this.csvService.exportCSV(
-        this.data, `${this.exportFileName}_${new Date().getTime()}.csv`);
+        this.data, `${this.exportFileName}_${formattedDate}.csv`);
   }
 
   expandedCells: Map<string, boolean> = new Map();
