@@ -66,11 +66,7 @@ Before running the application, you will need the following:
       <img src="src/assets/cloud_shell_icon.png" alt="Cloud Shell Terminal Button" />
     </p>
 
-2.  **Gemini API Key**:
-    - Navigate to the [Google Cloud Console](https://console.cloud.google.com).
-    - Search for and go to **Credentials** (under the *APIs & Services* section).
-    - Look for the API key configured for Gemini under the **API Keys** section.
-    - You can verify the key's allowed scope by checking the restrictions column to see which APIs can be accessed with that specific API key.
+
 
 ## Running Locally
 

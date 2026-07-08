@@ -159,7 +159,7 @@ describe('EvalService', () => {
       })));
 
       await expectAsync(service.scoreResponse('query', 'response', 'golden', config))
-          .toBeRejectedWithError('Permission denied. Please check your Gemini API key.');
+          .toBeRejectedWithError('Permission denied. Please check your Google Cloud access token.');
     });
 
     it('should throw model not found error for 404 status if JSON parsing fails', async () => {

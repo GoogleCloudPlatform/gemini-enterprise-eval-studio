@@ -269,7 +269,7 @@ export class EvalService {
         errorMessage = errorData.error?.message || `HTTP error! status: ${res.status}`;
       } catch (e) {
         if (res.status === 403 || res.status === 401) {
-          errorMessage = 'Permission denied. Please check your Gemini API key.';
+          errorMessage = 'Permission denied. Please check your Google Cloud access token.';
         } else if (res.status === 404) {
           errorMessage = `Model '${config.autoRaterModel}' not found or not available.`;
         } else if (res.status === 429) {
