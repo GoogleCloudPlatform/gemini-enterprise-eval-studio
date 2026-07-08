@@ -39,6 +39,8 @@ export class CompareEvalsComponent {
   comparisonResults: ComparisonResult[] = [];
   isDraggingBaseline = false;
   isDraggingRecent = false;
+  baselineError: string|null = null;
+  recentError: string|null = null;
 
   columns: ColumnDef[] = [
     {header: 'Query', key: 'query', truncate: true},
@@ -127,12 +129,39 @@ export class CompareEvalsComponent {
   private handleFileSelection(file: File, type: 'baseline'|'recent') {
     if (type === 'baseline') {
       this.baselineFile = file;
+      this.baselineError = null;
     } else {
       this.recentFile = file;
+      this.recentError = null;
     }
 
     this.csvService.parseCSV(file, (data) => {
       const normalizedData = this.normalizeRows(data);
+
+      if (normalizedData.length > 0) {
+        const headers = Object.keys(normalizedData[0]);
+        const requiredColumns = ['query', 'score', 'fetched'];
+        const missingColumns =
+            requiredColumns.filter(col => !headers.includes(col));
+
+        if (missingColumns.length > 0) {
+          if (type === 'baseline') {
+            this.baselineFile = null;
+            this.baselineError =
+                `CSV must contain columns: query, score, fetched. Missing columns - ${
+                    missingColumns.join(', ')}`;
+
+          } else {
+            this.recentFile = null;
+            this.recentError =
+                `CSV must contain columns: query, score, fetched. Missing columns - ${
+                    missingColumns.join(', ')}`;
+          }
+          this.cdr.detectChanges();
+          return;
+        }
+      }
+
       if (type === 'baseline') {
         this.baselineRows = normalizedData;
       } else {
