@@ -15,7 +15,7 @@
  */
 
 import {CommonModule} from '@angular/common';
-import {HttpClient} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {ChangeDetectorRef, Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, OnInit, Output, ViewChild} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 import {Subject} from 'rxjs';
@@ -158,12 +158,20 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
               this.cdr.detectChanges();
             }
           },
-          error: (error) => {
+          error: (error: unknown) => {
             this.loading = false;
             this.engines = [];
             this.stateService.setEngines([]);
-            this.errorMessage =
-                'Error fetching engines. See console for details.';
+            console.error('Error fetching engines:', error);
+            let details = 'See console for details.';
+            if (error instanceof HttpErrorResponse) {
+              details = error.error?.error?.message || error.message || details;
+            } else if (error instanceof Error) {
+              details = error.message;
+            } else if (typeof error === 'string') {
+              details = error;
+            }
+            this.errorMessage = `Error fetching engines: ${details}`;
             this.cdr.detectChanges();
           }
         });

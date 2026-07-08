@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {HttpClient} from '@angular/common/http';
+import {HttpClient, HttpErrorResponse} from '@angular/common/http';
 import {TestBed} from '@angular/core/testing';
 import {BehaviorSubject, of, throwError} from 'rxjs';
 
@@ -128,7 +128,7 @@ describe('ConfigFormComponent', () => {
               jasmine.any(Object));
     });
 
-    it('should handle HTTP error when fetching engines', () => {
+    it('should handle Error when fetching engines', () => {
       const fixture = TestBed.createComponent(ConfigFormComponent);
       const component = fixture.componentInstance;
       component.config.gCloudToken = 'token';
@@ -139,8 +139,26 @@ describe('ConfigFormComponent', () => {
 
       component.fetchEngines();
 
+      expect(component.errorMessage).toBe('Error fetching engines: HTTP error');
+      expect(component.loading).toBeFalse();
+    });
+
+    it('should handle HttpErrorResponse when fetching engines', () => {
+      const fixture = TestBed.createComponent(ConfigFormComponent);
+      const component = fixture.componentInstance;
+      component.config.gCloudToken = 'token';
+      component.config.projectId = 'project';
+
+      mockHttpClient.get.and.returnValue(
+          throwError(() => new HttpErrorResponse({
+            status: 403,
+            error: {error: {message: 'Permission denied'}}
+          })));
+
+      component.fetchEngines();
+
       expect(component.errorMessage)
-          .toBe('Error fetching engines. See console for details.');
+          .toBe('Error fetching engines: Permission denied');
       expect(component.loading).toBeFalse();
     });
 
