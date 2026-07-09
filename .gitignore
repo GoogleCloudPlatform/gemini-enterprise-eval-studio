@@ -1,0 +1,7 @@
+# dependencies
+/node_modules
+
+# Angular files
+/.angular
+/dist
+/out-tsc
