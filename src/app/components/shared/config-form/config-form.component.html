@@ -155,20 +155,23 @@
             <div class="max-h-60 overflow-y-auto p-1.5 space-y-1">
               <div
                 *ngFor="let option of filteredConnectors()"
-                class="flex items-center gap-2 p-1.5 hover:bg-blue-50 rounded cursor-pointer transition-colors"
-                (click)="toggleDataStore(option.id); $event.stopPropagation()"
+                class="flex flex-col p-1.5 hover:bg-blue-50 rounded cursor-pointer transition-colors"
+                (click)="toggleConnector(option); $event.stopPropagation()"
               >
-                <input
-                  type="checkbox"
-                  [id]="'connector-' + option.id"
-                  [checked]="isSelected(option.id)"
-                  (change)="toggleDataStore(option.id)"
-                  (click)="$event.stopPropagation()"
-                  class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
-                />
-                <label [for]="'connector-' + option.id" class="text-sm text-gray-700 w-full cursor-pointer select-none">
-                  {{ option.label }}
-                </label>
+                <div class="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    [id]="'connector-' + option.id"
+                    [checked]="isConnectorSelected(option)"
+                    (change)="toggleConnector(option)"
+                    (click)="$event.stopPropagation()"
+                    class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+                  />
+                  <label [for]="'connector-' + option.id" class="text-sm text-gray-700 w-full cursor-pointer select-none flex items-center justify-between">
+                    <span>{{ option.displayName }}</span>
+                    <span *ngIf="option.entityIds.length > 1" class="text-xs text-gray-400 font-normal">({{ option.entityIds.length }} entities)</span>
+                  </label>
+                </div>
               </div>
               <div *ngIf="filteredConnectors().length === 0" class="text-sm text-gray-500 p-3 text-center">
                 No connectors found.
