@@ -179,6 +179,11 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
             this.fetchConnectorsForSelectedEngine();
           }
         });
+
+    this.stateService.errorMessage$.pipe(takeUntil(this.destroy$))
+        .subscribe((errorMessage: string) => {
+          this.errorMessage = errorMessage;
+        });
   }
 
   ngOnDestroy() {
@@ -191,6 +196,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
    */
   fetchEngines() {
     this.errorMessage = '';
+    this.stateService.setErrorMessage('');
     if (!this.config.gCloudToken || !this.config.projectId) {
       this.errorMessage = 'Please provide gCloud Token and Project ID';
       return;
@@ -552,6 +558,21 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
    */
   onConfigChange() {
     this.stateService.setConfig(this.config);
+  }
+
+  /**
+   * Resets the engines list when the token, project ID, or region is changed.
+   */
+  changeConfigAndResetEngines() {
+    this.config.selectedEngine = '';
+    this.config.selectedModel = '';
+    this.config.selectedDataStores = [];
+    this.config.enableWebSearch = false;
+    this.stateService.setConfig(this.config);
+
+    this.engines = [];
+    this.stateService.setEngines([]);
+    this.cdr.detectChanges();
   }
 
   @HostListener('document:click', ['$event'])

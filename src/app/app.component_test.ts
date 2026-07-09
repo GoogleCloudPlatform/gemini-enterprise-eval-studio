@@ -28,6 +28,7 @@ describe('AppComponent', () => {
   let resultsSubject: BehaviorSubject<ResultRow[]>;
   let configSubject: BehaviorSubject<AppConfig>;
   let enginesSubject: BehaviorSubject<Engine[]>;
+  let errorMessageSubject: BehaviorSubject<string>;
 
   beforeEach(async () => {
     currentTabSubject = new BehaviorSubject<string>('run');
@@ -44,12 +45,21 @@ describe('AppComponent', () => {
       enableWebSearch: false
     });
     enginesSubject = new BehaviorSubject<Engine[]>([]);
+    errorMessageSubject = new BehaviorSubject<string>('');
     mockStateService = jasmine.createSpyObj(
-        'StateService', ['getCurrentConfig', 'getEngines', 'setConfig'], {
+        'StateService',
+        [
+          'getCurrentConfig',
+          'getEngines',
+          'setConfig',
+          'setErrorMessage',
+        ],
+        {
           currentTab$: currentTabSubject.asObservable(),
           results$: resultsSubject.asObservable(),
           config$: configSubject.asObservable(),
-          engines$: enginesSubject.asObservable()
+          engines$: enginesSubject.asObservable(),
+          errorMessage$: errorMessageSubject.asObservable(),
         });
     mockStateService.getEngines.and.returnValue([]);
     mockStateService.getCurrentConfig.and.returnValue({

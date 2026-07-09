@@ -28,6 +28,7 @@ describe('ConfigFormComponent', () => {
   let mockHttpClient: jasmine.SpyObj<HttpClient>;
   let configSubject: BehaviorSubject<AppConfig>;
   let enginesSubject: BehaviorSubject<Engine[]>;
+  let errorMessageSubject: BehaviorSubject<string>;
 
   beforeEach(async () => {
     configSubject = new BehaviorSubject<AppConfig>({
@@ -43,11 +44,15 @@ describe('ConfigFormComponent', () => {
     });
 
     enginesSubject = new BehaviorSubject<Engine[]>([]);
+    errorMessageSubject = new BehaviorSubject<string>('');
+
 
     mockStateService = jasmine.createSpyObj(
-        'StateService', ['setConfig', 'setEngines', 'getCurrentConfig'], {
+        'StateService',
+        ['setConfig', 'setEngines', 'getCurrentConfig', 'setErrorMessage'], {
           config$: configSubject.asObservable(),
-          engines$: enginesSubject.asObservable()
+          engines$: enginesSubject.asObservable(),
+          errorMessage$: errorMessageSubject.asObservable()
         });
 
     mockStateService.getCurrentConfig.and.callFake(() => configSubject.value);
@@ -764,5 +769,45 @@ describe('ConfigFormComponent', () => {
       expect(component.inferConnectorMetadata({id: 'custom-ds', displayName: 'Custom Data Store'})).toEqual({key: 'custom-ds', displayName: 'Custom Data Store'});
       expect(component.inferConnectorMetadata('unknown-connector')).toEqual({key: 'unknown-connector', displayName: 'unknown-connector'});
     });
+  });
+
+  describe('changeConfigAndResetEngines', () => {
+    it('should reset engines and clear selectedEngine / selectedModel when token, project ID, or region changes',
+       () => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+
+         // State where engines have been fetched
+         component.engines =
+             [{name: 'engine-1', displayName: 'Engine 1', modelConfigs: {}}];
+         component.config = {
+           gCloudToken: 'token-1',
+           projectId: 'project-1',
+           region: 'global',
+           selectedEngine: 'engine-1',
+           selectedModel: 'model-1',
+           autoRaterModel: 'auto',
+           autoRaterInstruction: 'instruction',
+           selectedDataStores: [],
+           enableWebSearch: false
+         };
+
+         // Changing config fields and triggering reset handler
+         component.config.gCloudToken = 'token-2';
+         component.config.projectId = 'project-2';
+         component.config.region = 'us';
+         component.changeConfigAndResetEngines();
+
+         expect(component.engines).toEqual([]);
+         expect(component.config.selectedEngine).toBe('');
+         expect(component.config.selectedModel).toBe('');
+         expect(component.config.gCloudToken).toBe('token-2');
+         expect(component.config.projectId).toBe('project-2');
+         expect(component.config.region).toBe('us');
+
+         expect(mockStateService.setEngines).toHaveBeenCalledWith([]);
+         expect(mockStateService.setConfig)
+             .toHaveBeenCalledWith(component.config);
+       });
   });
 });

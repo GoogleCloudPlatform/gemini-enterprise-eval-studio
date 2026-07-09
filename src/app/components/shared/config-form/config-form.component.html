@@ -14,7 +14,7 @@
         <input
           aria-label="gCloud Access Token"
           [(ngModel)]="config.gCloudToken"
-          (ngModelChange)="onConfigChange()"
+          (ngModelChange)="changeConfigAndResetEngines()"
           type="password"
           class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
           placeholder="ya29..."
@@ -31,7 +31,7 @@
         <input
           id="projectId"
           [(ngModel)]="config.projectId"
-          (ngModelChange)="onConfigChange()"
+          (ngModelChange)="changeConfigAndResetEngines()"
           type="text"
           class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
           placeholder="my-project-id"
@@ -48,7 +48,7 @@
         <select
           aria-label="Region"
           [(ngModel)]="config.region"
-          (ngModelChange)="onConfigChange()"
+          (ngModelChange)="changeConfigAndResetEngines()"
           class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
         >
           <option value="global">global</option>

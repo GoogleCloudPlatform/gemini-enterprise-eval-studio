@@ -106,6 +106,9 @@ export class StateService {
   engines$ =
       this.enginesSubject.asObservable().pipe(map(e => structuredClone(e)));
 
+  private errorMessageSubject = new BehaviorSubject<string>('');
+  /** Observable of the error message. */
+  errorMessage$ = this.errorMessageSubject.asObservable();
 
   /** Sets the current active tab. */
   setTab(tab: string) {
@@ -131,6 +134,10 @@ export class StateService {
   /** Sets the evaluation results. */
   setResults(results: ResultRow[]) {
     this.resultsSubject.next(structuredClone(results));
+  }
+
+  setErrorMessage(errorMessage: string) {
+    this.errorMessageSubject.next(errorMessage);
   }
 
   /** Sets the fetched engines. */

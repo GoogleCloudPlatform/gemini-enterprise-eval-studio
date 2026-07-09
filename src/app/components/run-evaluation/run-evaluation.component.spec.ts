@@ -47,10 +47,19 @@ describe('RunEvaluationComponent', () => {
 
     mockStateService = jasmine.createSpyObj(
         'StateService',
-        ['getCurrentConfig', 'getEngines', 'setResults', 'setConfig', 'setEngines'], {
+        [
+          'getCurrentConfig',
+          'getEngines',
+          'setResults',
+          'setConfig',
+          'setEngines',
+          'setErrorMessage',
+        ],
+        {
           results$: resultsSubject.asObservable(),
           config$: configSubject.asObservable(),
           engines$: of([]),
+          errorMessage$: of(''),
         });
     mockStateService.getCurrentConfig.and.callFake(() => configSubject.value);
     mockStateService.getEngines.and.returnValue([{name: 'engine', displayName: 'Engine', modelConfigs: {}}]);
