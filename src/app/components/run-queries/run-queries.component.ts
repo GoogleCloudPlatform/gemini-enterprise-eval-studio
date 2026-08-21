@@ -128,26 +128,30 @@ export class RunQueriesComponent {
     this.step = 3;
     this.cdr.detectChanges();
 
-    const tasks = this.responseCsvRows.map(row => async () => {
+    const results: Array<Record<string, any> | undefined> =
+        new Array(this.totalRows);
+
+    const tasks = this.responseCsvRows.map((row, rowIndex) => async () => {
       if (runId !== this.currentRunId || !this.isProcessingResponse) return;
 
       const csvRow: any = {query: row['query']};
       const result = await this.evalService.processRow(csvRow);
       if (runId !== this.currentRunId || !this.isProcessingResponse) return;
 
-      this.responseResults = [
-        ...this.responseResults, {
-          query: result.query,
-          response: result.fetched,
-          ttft: result.ttft,
-          ttfa: result.ttfa,
-          ttlt: result.ttlt,
-          assistToken: result.assistToken,
-          projectId: result.projectId,
-          region: result.region,
-          engineId: result.engineId
-        }
-      ];
+      results[rowIndex] = {
+        query: result.query,
+        response: result.fetched,
+        ttft: result.ttft,
+        ttfa: result.ttfa,
+        ttlt: result.ttlt,
+        assistToken: result.assistToken,
+        projectId: result.projectId,
+        region: result.region,
+        engineId: result.engineId
+      };
+
+      this.responseResults =
+          results.filter((r): r is Record<string, any> => r !== undefined);
 
       this.completedRows++;
       this.responseProgress =

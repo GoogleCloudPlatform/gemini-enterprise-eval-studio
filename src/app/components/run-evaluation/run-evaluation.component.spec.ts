@@ -241,5 +241,55 @@ describe('RunEvaluationComponent', () => {
 
        expect(mockEvalService.processRow).toHaveBeenCalledTimes(4);
      }));
+
+  it('should maintain original CSV row order even if requests complete out of order', fakeAsync(() => {
+    const fixture = TestBed.createComponent(RunEvaluationComponent);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const sampleRows = [
+      {query: 'slow_row_1', golden: 'g1'},
+      {query: 'fast_row_2', golden: 'g2'}
+    ];
+
+    let resolveSlowRow: (value: ResultRow) => void;
+    const slowRowPromise = new Promise<ResultRow>((resolve) => {
+      resolveSlowRow = resolve;
+    });
+
+    mockEvalService.processRow.and.callFake(async (row) => {
+      if (row.query === 'slow_row_1') {
+        return slowRowPromise;
+      }
+      return {
+        query: 'fast_row_2',
+        golden: 'g2',
+        fetched: 'fetched-fast_row_2',
+        ttft: 10,
+        ttfa: 20,
+        ttlt: 30,
+        score: 0.9
+      };
+    });
+
+    component.startEvaluation({file: new File([], 'test.csv'), rows: sampleRows});
+    tick();
+
+    resolveSlowRow!({
+      query: 'slow_row_1',
+      golden: 'g1',
+      fetched: 'fetched-slow_row_1',
+      ttft: 10,
+      ttfa: 20,
+      ttlt: 30,
+      score: 0.9
+    });
+    tick();
+
+    const lastCallResults = mockStateService.setResults.calls.mostRecent().args[0];
+    expect(lastCallResults.length).toBe(2);
+    expect(lastCallResults[0].query).toBe('slow_row_1');
+    expect(lastCallResults[1].query).toBe('fast_row_2');
+  }));
 });
 

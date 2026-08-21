@@ -138,10 +138,10 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     this.step = 3;
     this.stateService.setResults([]);
     this.cdr.detectChanges();
-    const results: ResultRow[] = [];
+    const results: Array<ResultRow | undefined> = new Array(this.totalRows);
 
     if (this.totalRows === 0) return;
-    const tasks = event.rows.map(row => async () => {
+    const tasks = event.rows.map((row, rowIndex) => async () => {
       if (runId !== this.currentRunId || !this.isProcessing) return;
 
       const result = await this.evalService.processRow(row);
@@ -152,8 +152,9 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
             `Scoring failed for some rows: ${result.scoreError}`;
       }
 
-      results.push(result);
-      this.stateService.setResults(results);
+      results[rowIndex] = result;
+      this.stateService.setResults(
+          results.filter((r): r is ResultRow => r !== undefined));
       this.completedRows++;
       this.progress = Math.round((this.completedRows / this.totalRows) * 100);
       this.cdr.detectChanges();
