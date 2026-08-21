@@ -14,10 +14,12 @@
  * limitations under the License.
  */
 
-import {Router, Request, Response} from 'express';
-import {Config} from './config';
-import {createAuthenticateMiddleware} from './auth';
+import * as nodeCrypto from 'crypto';
+import {Request, Response, Router} from 'express';
 import {google} from 'googleapis';
+
+import {createAuthenticateMiddleware} from './auth';
+import {Config} from './config';
 import {RefreshTokenStore} from './store';
 
 const ENGINE_PATH_REGEX = /^projects\/([^/]+)\/locations\/([^/]+)\/collections\/([^/]+)\/engines\/([^/]+)$/;
@@ -58,6 +60,13 @@ export function createProxyRouter(config: Config, refreshTokenStore?: RefreshTok
     const url = `https://${baseUrl}/v1/${selectedEngine}/assistants/default_assistant:streamAssist`;
 
     try {
+      let traceContext =
+          req.headers && (req.headers['x-cloud-trace-context'] as string);
+      if (!traceContext && process.env['NODE_ENV'] !== 'production') {
+        const randomTraceId = nodeCrypto.randomBytes(16).toString('hex');
+        traceContext = `${randomTraceId}/1;o=1`;
+      }
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -66,6 +75,16 @@ export function createProxyRouter(config: Config, refreshTokenStore?: RefreshTok
         },
         body: JSON.stringify(body),
       });
+
+      let traceHeader = response.headers.get('x-cloud-trace-context');
+      if (!traceHeader && traceContext) {
+        traceHeader = traceContext;
+      }
+
+      if (traceHeader) {
+        res.setHeader('x-cloud-trace-context', traceHeader);
+        res.setHeader('Access-Control-Expose-Headers', 'x-cloud-trace-context');
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
