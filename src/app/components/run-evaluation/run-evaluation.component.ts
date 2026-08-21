@@ -61,7 +61,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
 
   columns: ColumnDef[] = [
     {header: 'Query', key: 'query', truncate: true},
-    {header: 'Golden', key: 'golden', truncate: true},
+    {header: 'Golden', key: 'golden', type: 'markdown', truncate: true},
     {header: 'Fetched', key: 'fetched', type: 'markdown', truncate: true},
     {header: 'TTFT (s)', key: 'ttft', type: 'number'},
     {header: 'TTFA (s)', key: 'ttfa', type: 'number'},
