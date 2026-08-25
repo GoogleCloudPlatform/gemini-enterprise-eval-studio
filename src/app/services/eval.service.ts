@@ -96,6 +96,8 @@ export class EvalService {
     let assistToken = '';
     let isFirstChunk = true;
     let isFirstUserChunk = true;
+    const citations: Array<{title?: string; uri?: string}> = [];
+    const seenCitations = new Set<string>();
 
     try {
       onProgress?.('fetch');
@@ -150,6 +152,8 @@ export class EvalService {
               const item = parsedData[i];
               processedItemsCount++;
 
+              this.extractCitations(item, citations, seenCitations);
+
               if (item.assistToken) {
                 assistToken = item.assistToken;
               }
@@ -189,6 +193,23 @@ export class EvalService {
         } catch (e) {
           console.error('Error processing chunk:', e);
         }
+      }
+
+      if (citations.length > 0 && !fullText.startsWith('SKIPPED:')) {
+        const trimmed = fullText.trimEnd();
+        fullText = trimmed + '\n\nSources:\n\n';
+        for (let i = 0; i < citations.length; i++) {
+          const cit = citations[i];
+          const index = i + 1;
+          if (cit.title && cit.uri && cit.title !== cit.uri) {
+            fullText += `[${index}] ${cit.title} - ${cit.uri}\n\n`;
+          } else if (cit.title) {
+            fullText += `[${index}] ${cit.title}\n\n`;
+          } else if (cit.uri) {
+            fullText += `[${index}] ${cit.uri}\n\n`;
+          }
+        }
+        fullText = fullText.trimEnd();
       }
 
       const ttlt = Date.now() - startTime;
@@ -328,5 +349,112 @@ export class EvalService {
       }
     }
     return 0;
+  }
+
+  /**
+   * Extracts citations from an item in the streamAssist response.
+   * @param item The parsed item from streamAssist stream.
+   * @param citations Array to accumulate unique citations.
+   * @param seen Set of citation keys to prevent duplicates.
+   */
+  private extractCitations(
+      item: any,
+      citations: Array<{title?: string; uri?: string}>,
+      seen: Set<string>,
+  ): void {
+    if (!item) return;
+    if (Array.isArray(item)) {
+      for (const elem of item) {
+        this.extractCitations(elem, citations, seen);
+      }
+      return;
+    }
+
+    const addCitation = (title?: string, uri?: string) => {
+      const cleanTitle = typeof title === 'string' ? title.trim() : '';
+      const cleanUri = typeof uri === 'string' ? uri.trim() : '';
+      if (!cleanTitle && !cleanUri) return;
+
+      const key = `${cleanUri}::${cleanTitle}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        citations.push({title: cleanTitle, uri: cleanUri});
+      }
+    };
+
+    const inspectObject = (obj: any) => {
+      if (!obj) return;
+
+      // 1. groundingAttributions (web: {title, uri} or direct {title, uri})
+      const attributions =
+          obj.groundingAttributions || obj.groundingMetadata?.groundingAttributions;
+      if (Array.isArray(attributions)) {
+        for (const att of attributions) {
+          if (typeof att === 'string') {
+            addCitation('', att);
+          } else if (att) {
+            addCitation(att.web?.title || att.title, att.web?.uri || att.uri);
+          }
+        }
+      }
+
+      // 2. textGroundingMetadata.references (documentMetadata: {title, uri})
+      const references = obj.textGroundingMetadata?.references ||
+          obj.groundingMetadata?.references;
+      if (Array.isArray(references)) {
+        for (const ref of references) {
+          if (typeof ref === 'string') {
+            addCitation('', ref);
+          } else if (ref) {
+            addCitation(
+                ref.documentMetadata?.title || ref.title,
+                ref.documentMetadata?.uri || ref.uri);
+          }
+        }
+      }
+
+      // 3. groundingChunks (web or retrievedContext: {title, uri})
+      const chunks =
+          obj.groundingMetadata?.groundingChunks || obj.groundingChunks;
+      if (Array.isArray(chunks)) {
+        for (const chunk of chunks) {
+          if (typeof chunk === 'string') {
+            addCitation('', chunk);
+          } else if (chunk) {
+            addCitation(
+                chunk.web?.title || chunk.retrievedContext?.title || chunk.title,
+                chunk.web?.uri || chunk.retrievedContext?.uri || chunk.uri);
+          }
+        }
+      }
+
+      // 4. citationMetadata.citations ({title, uri})
+      const cits = obj.citationMetadata?.citations || obj.citations;
+      if (Array.isArray(cits)) {
+        for (const cit of cits) {
+          if (typeof cit === 'string') {
+            addCitation('', cit);
+          } else if (cit) {
+            addCitation(cit.title, cit.uri || cit.url);
+          }
+        }
+      }
+    };
+
+    const objectsToInspect = [
+      item,
+      item.answer,
+      ...(Array.isArray(item.answer?.replies) ? item.answer.replies : []),
+      ...(Array.isArray(item.replies) ? item.replies : []),
+      ...(Array.isArray(item.candidates) ? item.candidates : []),
+    ];
+
+    for (const obj of objectsToInspect) {
+      if (!obj) continue;
+      inspectObject(obj);
+      if (obj.groundedContent) {
+        inspectObject(obj.groundedContent);
+      }
+    }
   }
 }

@@ -78,7 +78,7 @@ export class CsvTableComponent implements OnChanges {
     if (!text) return '';
     if (typeof marked !== 'undefined' && marked && typeof marked.parse === 'function') {
       try {
-        return marked.parse(text);
+        return marked.parse(text, {breaks: true, gfm: true});
       } catch (e) {
         console.error('Failed to parse markdown with marked:', e);
       }

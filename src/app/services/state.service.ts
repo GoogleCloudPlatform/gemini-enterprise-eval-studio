@@ -57,7 +57,7 @@ export class StateService {
       selectedModel: '',
       autoRaterModel: '',
       autoRaterInstruction:
-          'You are an expert evaluator. Compare the fetched response to the golden response for the given query. Calculate a semantic similarity score between 0.0 and 1.0...',
+          'You are an expert evaluator. Compare the fetched response (including any cited grounding sources) to the golden response for the given query. Verify that the answer is accurate and supported by valid citations. Calculate an overall score between 0.0 and 1.0 based on correctness and citation grounding.',
       selectedDataStores: [],
       enableWebSearch: false
     };

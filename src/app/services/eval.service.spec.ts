@@ -234,6 +234,149 @@ describe('EvalService', () => {
       expect(result.score).toBe(0);
       expect(result.scoreError).toContain('HTTP error! status: 500');
     });
+
+    it('should extract citations from groundingAttributions and embed in fetched text', async () => {
+      mockBackendService.callAssistSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify([{
+        answer: {
+          replies: [{
+            groundedContent: {
+              content: {
+                text: 'Here is the answer.'
+              }
+            }
+          }],
+          groundingAttributions: [{
+            web: {
+              title: 'Doc 1',
+              uri: 'https://example.com/1'
+            }
+          }]
+        }
+      }]))));
+
+      mockBackendService.callScoreSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '0.9' }] } }]
+      }))));
+
+      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
+
+      const result = await service.processRow({
+        query: 'my query',
+        golden: 'my golden'
+      });
+
+      expect(result.fetched).toContain('Here is the answer.');
+      expect(result.fetched).toContain('Sources:');
+      expect(result.fetched).toContain('[1] Doc 1 - https://example.com/1');
+      expect(result.score).toBe(0.9);
+    });
+
+    it('should extract citations from textGroundingMetadata references and deduplicate', async () => {
+      mockBackendService.callAssistSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify([{
+        answer: {
+          replies: [{
+            groundedContent: {
+              content: {
+                text: 'Here is the answer.'
+              },
+              textGroundingMetadata: {
+                references: [
+                  {
+                    documentMetadata: {
+                      title: 'Ref 1',
+                      uri: 'https://example.com/ref1'
+                    }
+                  },
+                  {
+                    documentMetadata: {
+                      title: 'Ref 1',
+                      uri: 'https://example.com/ref1'
+                    }
+                  }
+                ]
+              }
+            }
+          }]
+        }
+      }]))));
+
+      mockBackendService.callScoreSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '1.0' }] } }]
+      }))));
+
+      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
+
+      const result = await service.processRow({
+        query: 'my query',
+        golden: 'my golden'
+      });
+
+      expect(result.fetched).toContain('[1] Ref 1 - https://example.com/ref1');
+      expect(result.fetched).not.toContain('[2]');
+    });
+
+    it('should format citations when only title or uri is present or when equal', async () => {
+      mockBackendService.callAssistSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify([{
+        answer: {
+          replies: [{
+            groundedContent: {
+              content: {
+                text: 'Answer.'
+              }
+            }
+          }],
+          groundingAttributions: [
+            { title: 'Only Title' },
+            { uri: 'https://only-uri.com' },
+            { title: 'https://same-uri.com', uri: 'https://same-uri.com' }
+          ]
+        }
+      }]))));
+
+      mockBackendService.callScoreSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '0.8' }] } }]
+      }))));
+
+      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
+
+      const result = await service.processRow({
+        query: 'my query',
+        golden: 'my golden'
+      });
+
+      expect(result.fetched).toContain('[1] Only Title');
+      expect(result.fetched).toContain('[2] https://only-uri.com');
+      expect(result.fetched).toContain('[3] https://same-uri.com');
+      expect(result.fetched).not.toContain('https://same-uri.com - https://same-uri.com');
+    });
+
+    it('should extract citations when grounding metadata arrives in a later streaming chunk', async () => {
+      const stream = new ReadableStream({
+        start(controller) {
+          const chunk1 = '[{"answer":{"replies":[{"groundedContent":{"content":{"text":"First part."}}}]}}';
+          const chunk2 = ',{"answer":{"replies":[{"groundedContent":{"textGroundingMetadata":{"references":[{"documentMetadata":{"title":"Doc 2","uri":"https://example.com/2"}}]}}}]}}]';
+          controller.enqueue(new TextEncoder().encode(chunk1));
+          controller.enqueue(new TextEncoder().encode(chunk2));
+          controller.close();
+        }
+      });
+
+      mockBackendService.callAssistSpy.and.returnValue(Promise.resolve(new Response(stream)));
+
+      mockBackendService.callScoreSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: '0.9' }] } }]
+      }))));
+
+      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
+
+      const result = await service.processRow({
+        query: 'my query',
+        golden: 'my golden'
+      });
+
+      expect(result.fetched).toContain('First part.');
+      expect(result.fetched).toContain('[1] Doc 2 - https://example.com/2');
+    });
   });
 });
 
