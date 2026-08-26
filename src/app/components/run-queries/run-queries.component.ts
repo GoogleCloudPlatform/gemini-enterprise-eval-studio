@@ -43,15 +43,17 @@ const MAX_CONCURRENT_REQUESTS_FOR_QUERIES = 5;
 export class RunQueriesComponent {
   step = 1;
   columns: ColumnDef[] = [
-    {header: 'Query', key: 'query', truncate: true}, {
-      header: 'Response',
-      key: 'response',
-      type: 'markdown',
-      truncate: true
-    },
+    {header: 'Query', key: 'query', truncate: true},
+    {header: 'Response', key: 'response', type: 'markdown', truncate: true},
     {header: 'TTFT (s)', key: 'ttft', type: 'number'},
     {header: 'TTFA (s)', key: 'ttfa', type: 'number'},
-    {header: 'TTLT (s)', key: 'ttlt', type: 'number'}
+    {header: 'TTLT (s)', key: 'ttlt', type: 'number'}, {
+      header: 'Trace',
+      key: 'traceId',
+      type: 'link',
+      hrefKey: 'traceUrl',
+      linkText: 'View Trace'
+    }
   ];
   responseFile: File|null = null;
   responseCsvRows: Array<Record<string, string>> = [];
@@ -147,7 +149,9 @@ export class RunQueriesComponent {
         assistToken: result.assistToken,
         projectId: result.projectId,
         region: result.region,
-        engineId: result.engineId
+        engineId: result.engineId,
+        traceId: result.traceId,
+        traceUrl: result.traceUrl
       };
 
       this.responseResults =

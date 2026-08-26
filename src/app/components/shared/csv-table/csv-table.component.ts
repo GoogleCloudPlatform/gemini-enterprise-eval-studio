@@ -27,7 +27,9 @@ declare var marked: any;
 export interface ColumnDef {
   header: string;
   key: string;
-  type?: 'text'|'markdown'|'number'|'score'|'delta';
+  type?: 'text'|'markdown'|'number'|'score'|'delta'|'link';
+  hrefKey?: string;
+  linkText?: string;
   truncate?: boolean;
   width?: string;
 }
@@ -63,8 +65,18 @@ export class CsvTableComponent implements OnChanges {
     const formattedDate =
         formatDate(new Date(), 'yyyy-MM-dd_HH-mm-ss', 'en-US');
 
+    const exportedData = this.data.map(row => {
+      const exportedRow: Record<string, any> = {};
+      for (const col of this.columns) {
+        exportedRow[col.header] = col.type === 'link' && col.hrefKey ?
+            row[col.hrefKey] :
+            row[col.key];
+      }
+      return exportedRow;
+    });
+
     this.csvService.exportCSV(
-        this.data, `${this.exportFileName}_${formattedDate}.csv`);
+        exportedData, `${this.exportFileName}_${formattedDate}.csv`);
   }
 
   expandedCells: Map<string, boolean> = new Map();

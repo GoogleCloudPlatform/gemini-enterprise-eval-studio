@@ -65,7 +65,13 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     {header: 'Fetched', key: 'fetched', type: 'markdown', truncate: true},
     {header: 'TTFT (s)', key: 'ttft', type: 'number'},
     {header: 'TTFA (s)', key: 'ttfa', type: 'number'},
-    {header: 'TTLT (s)', key: 'ttlt', type: 'number'},
+    {header: 'TTLT (s)', key: 'ttlt', type: 'number'}, {
+      header: 'Trace',
+      key: 'traceId',
+      type: 'link',
+      hrefKey: 'traceUrl',
+      linkText: 'View Trace'
+    },
     {header: 'Score', key: 'score', type: 'score'}
   ];
 

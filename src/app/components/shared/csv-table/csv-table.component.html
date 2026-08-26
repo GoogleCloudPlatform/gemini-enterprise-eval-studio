@@ -75,6 +75,19 @@
               {{ row[col.key] }}
             </div>
 
+            <!-- Link Type -->
+            <div *ngIf="col.type === 'link'">
+              <a
+                *ngIf="row[col.key] || (col.hrefKey && row[col.hrefKey])"
+                [href]="col.hrefKey ? row[col.hrefKey] : row[col.key]"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-blue-600 hover:text-blue-800 underline"
+              >
+                {{ row[col.key] || col.linkText || col.header || 'Link' }}
+              </a>
+            </div>
+
             <!-- Score Type -->
             <div *ngIf="col.type === 'score'" class="font-medium">
               <span

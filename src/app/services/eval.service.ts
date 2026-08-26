@@ -98,6 +98,7 @@ export class EvalService {
     let isFirstUserChunk = true;
     const citations: Array<{title?: string; uri?: string}> = [];
     const seenCitations = new Set<string>();
+    let traceId: string|undefined;
 
     try {
       onProgress?.('fetch');
@@ -106,6 +107,14 @@ export class EvalService {
         region: config.region,
         body
       });
+
+      const traceHeader = response.headers.get('x-cloud-trace-context');
+      if (traceHeader) {
+        const match = traceHeader.match(/^([a-fA-F0-9]{32})/);
+        if (match) {
+          traceId = match[1];
+        }
+      }
 
       if (!response.ok) {
         if (response.status === 429) {
@@ -226,6 +235,8 @@ export class EvalService {
         }
       }
 
+      const finalTraceUrl = this.getTraceUrl(traceId, assistToken, projectId);
+
       return {
         query: row.query,
         golden: row.golden || '',
@@ -238,11 +249,15 @@ export class EvalService {
         projectId,
         region,
         engineId,
-        scoreError
+        scoreError,
+        traceId,
+        traceUrl: finalTraceUrl
       };
 
     } catch (error) {
       console.error('Error processing row:', error);
+      const finalTraceUrl = this.getTraceUrl(traceId, assistToken, projectId);
+
       return {
         query: row.query,
         golden: row.golden || '',
@@ -254,9 +269,28 @@ export class EvalService {
         assistToken,
         projectId,
         region,
-        engineId
+        engineId,
+        traceId,
+        traceUrl: finalTraceUrl
       };
     }
+  }
+
+  private getTraceUrl(
+      traceId?: string,
+      assistToken?: string,
+      projectId?: string,
+      ): string|undefined {
+    if (traceId) {
+      return `https://console.cloud.google.com/traces/explorer?project=${
+          projectId}&tid=${traceId}`;
+    }
+    if (assistToken && assistToken !== 'unknown') {
+      return `https://console.cloud.google.com/traces/explorer?project=${
+          projectId}&query=gemini_enterprise.assist_token%3D${
+          encodeURIComponent(assistToken)}`;
+    }
+    return undefined;
   }
 
   /**

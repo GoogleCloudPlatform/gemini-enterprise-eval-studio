@@ -33,4 +33,6 @@ export interface ResultRow {
   region?: string;
   engineId?: string;
   scoreError?: string;
+  traceId?: string;
+  traceUrl?: string;
 }
