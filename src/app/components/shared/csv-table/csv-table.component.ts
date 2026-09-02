@@ -72,6 +72,12 @@ export class CsvTableComponent implements OnChanges {
             row[col.hrefKey] :
             row[col.key];
       }
+      if ('assistToken' in row) {
+        exportedRow['Assist Token'] = row.assistToken || '';
+      }
+      if ('traceId' in row) {
+        exportedRow['Trace ID'] = row.traceId || '';
+      }
       return exportedRow;
     });
 
