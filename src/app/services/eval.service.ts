@@ -23,10 +23,15 @@ import {ResultRow} from '../models/result-row.model';
 import {EvalBackendService} from './eval-backend.service';
 import {StateService} from './state.service';
 
-
+interface SessionInfo {
+  session?: string;
+  turnId?: string;
+  [key: string]: unknown;
+}
 
 interface AssistRequestBody {
   query: {text: string};
+  session?: string;
   generationSpec?: {modelId: string};
   toolsSpec?: {
     vertexAiSearchSpec?: {
@@ -50,10 +55,12 @@ export class EvalService {
    * Processes a row for evaluation by calling streamAssist API.
    * @param row The CSV row to process.
    * @param onProgress Optional callback for progress updates.
+   * @param session Optional session resource name to continue a multi-turn conversation.
    * @returns A promise that resolves to the ResultRow.
    */
-  async processRow(row: CSVRow, onProgress?: (step: 'fetch'|'score') => void):
-      Promise<ResultRow> {
+  async processRow(
+      row: CSVRow, onProgress?: (step: 'fetch'|'score') => void,
+      session?: string): Promise<ResultRow> {
     const config = this.stateService.getCurrentConfig();
 
 
@@ -81,6 +88,10 @@ export class EvalService {
       toolsSpec,
     };
 
+    if (session) {
+      body.session = session;
+    }
+
     if (config.selectedModel !== 'auto') {
       body.generationSpec = {modelId: config.selectedModel};
     }
@@ -96,6 +107,7 @@ export class EvalService {
     let assistToken = '';
     let isFirstChunk = true;
     let isFirstUserChunk = true;
+    let sessionInfo: SessionInfo|undefined;
     const citations: Array<{title?: string; uri?: string}> = [];
     const seenCitations = new Set<string>();
     let traceId: string|undefined;
@@ -165,6 +177,15 @@ export class EvalService {
 
               if (item.assistToken) {
                 assistToken = item.assistToken;
+              }
+
+              if (item.sessionInfo) {
+                sessionInfo = {
+                  ...sessionInfo,
+                  ...item.sessionInfo,
+                  session: item.sessionInfo.session ?? sessionInfo?.session,
+                  turnId: item.sessionInfo.turnId ?? sessionInfo?.turnId,
+                };
               }
 
               if (item.answer?.state === 'SKIPPED') {
@@ -250,6 +271,8 @@ export class EvalService {
         region,
         engineId,
         scoreError,
+        session: sessionInfo?.session ?? session,
+        turnId: sessionInfo?.turnId,
         traceId,
         traceUrl: finalTraceUrl
       };
@@ -270,6 +293,8 @@ export class EvalService {
         projectId,
         region,
         engineId,
+        session: sessionInfo?.session ?? session,
+        turnId: sessionInfo?.turnId,
         traceId,
         traceUrl: finalTraceUrl
       };

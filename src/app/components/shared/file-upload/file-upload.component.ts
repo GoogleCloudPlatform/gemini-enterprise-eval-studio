@@ -93,7 +93,11 @@ export class FileUploadComponent {
       this.csvRows = data.map((row: any) => {
         const normalizedRow: any = {};
         for (const [key, value] of Object.entries(row)) {
-          const normalizedKey = key.trim().replace(/^\ufeff/, '').toLowerCase();
+          const rawKey = key.trim().replace(/^\ufeff/, '').toLowerCase();
+          const normalizedKey =
+              (rawKey === 'conversation_id' || rawKey === 'conversationid') ?
+              'conversationId' :
+              rawKey;
           normalizedRow[normalizedKey] = value;
         }
         return normalizedRow;

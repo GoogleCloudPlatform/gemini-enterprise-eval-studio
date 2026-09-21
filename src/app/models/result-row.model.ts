@@ -35,4 +35,12 @@ export interface ResultRow {
   scoreError?: string;
   traceId?: string;
   traceUrl?: string;
+  /** Conversation grouping id, present only for multi-turn rows. */
+  conversationId?: string;
+  /** Turn number within the conversation. */
+  turn?: number;
+  /** Discovery Engine session resource name used for/returned by this turn. */
+  session?: string;
+  /** Turn id returned by the Assistant API for this turn. */
+  turnId?: string;
 }

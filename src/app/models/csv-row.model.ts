@@ -20,5 +20,13 @@
 export interface CSVRow {
   query: string;
   golden: string;
-  [key: string]: string;
+  // Optional. Used to group rows into a conversation.
+  conversationId?: string;
+  /**
+   * Optional. Determines execution order within a conversationId
+   * (ascending numeric order). If omitted, rows are processed in their
+   * original CSV order.
+   */
+  turn?: string;
+  [key: string]: string | undefined;
 }
