@@ -43,6 +43,8 @@
         <ul class="list-disc pl-5 text-gray-700 text-sm space-y-1">
           <li><code class="bg-white px-1.5 py-0.5 rounded text-xs font-mono border border-gray-200">query</code>: The search or conversation prompt.</li>
           <li><code class="bg-white px-1.5 py-0.5 rounded text-xs font-mono border border-gray-200">golden</code>: The expected ideal response (baseline).</li>
+          <li><code class="bg-white px-1.5 py-0.5 rounded text-xs font-mono border border-gray-200">conversation_id</code> <em>(Optional)</em>: Groups multiple rows into a multi-turn conversation sharing the same Assistant session context.</li>
+          <li><code class="bg-white px-1.5 py-0.5 rounded text-xs font-mono border border-gray-200">turn</code> <em>(Required for multi-turn)</em>: Consecutive numeric turn order within a conversation starting at <code class="bg-white px-1 py-0.5 rounded text-xs font-mono border border-gray-200">0</code> or <code class="bg-white px-1 py-0.5 rounded text-xs font-mono border border-gray-200">1</code> (e.g., <code class="bg-white px-1 py-0.5 rounded text-xs font-mono border border-gray-200">1</code>, <code class="bg-white px-1 py-0.5 rounded text-xs font-mono border border-gray-200">2</code>, <code class="bg-white px-1 py-0.5 rounded text-xs font-mono border border-gray-200">3</code>). If a turn ID is missing or non-consecutive, remaining rows in that conversation are marked as <code class="bg-white px-1 py-0.5 rounded text-xs font-mono border border-gray-200">SKIPPED</code>.</li>
         </ul>
       </div>
 

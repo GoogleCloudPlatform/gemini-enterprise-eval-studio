@@ -59,10 +59,12 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   private currentRunId = 0;
 
-  columns: ColumnDef[] = [
+  private readonly allColumns: ColumnDef[] = [
     {header: 'Query', key: 'query', truncate: true},
     {header: 'Golden', key: 'golden', type: 'markdown', truncate: true},
     {header: 'Fetched', key: 'fetched', type: 'markdown', truncate: true},
+    {header: 'Conversation', key: 'conversationId', truncate: true},
+    {header: 'Turn', key: 'turn', type: 'number'},
     {header: 'TTFT (s)', key: 'ttft', type: 'number'},
     {header: 'TTFA (s)', key: 'ttfa', type: 'number'},
     {header: 'TTLT (s)', key: 'ttlt', type: 'number'},
@@ -74,6 +76,18 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       linkText: 'View Trace'
     }
   ];
+
+  get columns(): ColumnDef[] {
+    const hasMultiTurn =
+        this.uploadedRows.some(
+            r => Boolean(r.conversationId?.trim() || r.turn?.trim())) ||
+        this.results.some(
+            r => r.conversationId !== undefined || r.turn !== undefined);
+    return hasMultiTurn ?
+        this.allColumns :
+        this.allColumns.filter(
+            c => c.key !== 'conversationId' && c.key !== 'turn');
+  }
 
   constructor(
       private stateService: StateService, private evalService: EvalService,
@@ -136,6 +150,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
   async startEvaluation(event: {file: File, rows: CSVRow[]}) {
     if (this.isProcessing) return;
     const runId = ++this.currentRunId;
+    this.uploadedRows = event.rows;
     this.errorMessage = null;
     this.isProcessing = true;
     this.progress = 0;
@@ -147,23 +162,88 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     const results: Array<ResultRow | undefined> = new Array(this.totalRows);
 
     if (this.totalRows === 0) return;
-    const tasks = event.rows.map((row, rowIndex) => async () => {
-      if (runId !== this.currentRunId || !this.isProcessing) return;
 
-      const result = await this.evalService.processRow(row);
-      if (runId !== this.currentRunId || !this.isProcessing) return;
+    // Rows sharing a conversationId are turns of one multi-turn
+    // conversation and must run sequentially against the same Assistant
+    // session (concurrent calls against one session race on context
+    // visibility). Rows without a conversationId are independent
+    // single-turn queries, each its own one-row "conversation" below, and
+    // continue to run freely across the worker pool as before.
+    const conversations = this.groupIntoConversations(event.rows);
 
-      if (result.scoreError && !this.errorMessage) {
-        this.errorMessage =
-            `Scoring failed for some rows: ${result.scoreError}`;
-      }
+    let targetIndex = 0;
+    const tasks = conversations.map(turns => {
+      const isMultiTurn = turns.length > 1;
+      const indexedTurns =
+          turns.map(row => ({row, resultIndex: targetIndex++}));
 
-      results[rowIndex] = result;
-      this.stateService.setResults(
-          results.filter((r): r is ResultRow => r !== undefined));
-      this.completedRows++;
-      this.progress = Math.round((this.completedRows / this.totalRows) * 100);
-      this.cdr.detectChanges();
+      return async () => {
+        let session: string|undefined;
+        let expectedTurn: number|undefined;
+        let sequenceBroken = false;
+
+        for (let i = 0; i < indexedTurns.length; i++) {
+          if (runId !== this.currentRunId || !this.isProcessing) return;
+          const {row, resultIndex} = indexedTurns[i];
+          const currentTurn = this.toTurn(row.turn);
+
+          if (isMultiTurn) {
+            if (i === 0) {
+              if (currentTurn === 0 || currentTurn === 1) {
+                expectedTurn = currentTurn;
+              } else {
+                sequenceBroken = true;
+              }
+            }
+            if (!sequenceBroken && currentTurn !== expectedTurn) {
+              sequenceBroken = true;
+            }
+            if (sequenceBroken) {
+              results[resultIndex] = {
+                query: row.query,
+                golden: row.golden,
+                fetched: 'SKIPPED: Incorrect or missing turn ID.',
+                ttft: 0,
+                ttfa: 0,
+                ttlt: 0,
+                score: 0,
+                conversationId: row.conversationId,
+                turn: Number.isFinite(currentTurn) ? currentTurn : undefined,
+              };
+              this.stateService.setResults(
+                  results.filter((r): r is ResultRow => r !== undefined));
+              this.completedRows++;
+              this.progress =
+                  Math.round((this.completedRows / this.totalRows) * 100);
+              this.cdr.detectChanges();
+              continue;
+            }
+            expectedTurn!++;
+          }
+
+          const result =
+              await this.evalService.processRow(row, undefined, session);
+          session = result.session;
+          if (runId !== this.currentRunId || !this.isProcessing) return;
+
+          if (result.scoreError && !this.errorMessage) {
+            this.errorMessage =
+                `Scoring failed for some rows: ${result.scoreError}`;
+          }
+
+          results[resultIndex] = {
+            ...result,
+            conversationId: isMultiTurn ? row.conversationId : undefined,
+            turn: isMultiTurn ? currentTurn : undefined,
+          };
+          this.stateService.setResults(
+              results.filter((r): r is ResultRow => r !== undefined));
+          this.completedRows++;
+          this.progress =
+              Math.round((this.completedRows / this.totalRows) * 100);
+          this.cdr.detectChanges();
+        }
+      };
     });
 
     let index = 0;
@@ -267,5 +347,47 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
   stopEvaluation() {
     this.isProcessing = false;
     this.cdr.detectChanges();
+  }
+
+  /**
+   * Groups rows by conversationId, preserving each group's first-seen
+   * position in the input. Rows within a group are sorted by their `turn`
+   * value (ascending); rows without a `turn` keep their original relative
+   * order. Rows with no conversationId each become their own
+   * single-row group, matching today's single-turn behavior.
+   */
+  private groupIntoConversations(rows: CSVRow[]): CSVRow[][] {
+    const order: string[] = [];
+    const groups = new Map<string, CSVRow[]>();
+    let singletonIndex = 0;
+
+    for (const row of rows) {
+      const id = row.conversationId?.trim();
+      if (!id) {
+        const key = `__single_${singletonIndex++}`;
+        order.push(key);
+        groups.set(key, [row]);
+        continue;
+      }
+      if (!groups.has(id)) {
+        order.push(id);
+        groups.set(id, []);
+      }
+      groups.get(id)!.push(row);
+    }
+
+    for (const [id, groupRows] of groups) {
+      if (!id.startsWith('__single_')) {
+        groupRows.sort(
+            (a, b) => (this.toTurn(a.turn) - this.toTurn(b.turn)) || 0);
+      }
+    }
+
+    return order.map(id => groups.get(id)!);
+  }
+
+  private toTurn(t?: string, fallback = Infinity): number {
+    const num = t?.trim() ? Number(t) : fallback;
+    return Number.isNaN(num) ? fallback : num;
   }
 }

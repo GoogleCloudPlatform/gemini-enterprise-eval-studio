@@ -69,7 +69,7 @@
       [(csvRows)]="uploadedRows"
       (prev)="prevStep()"
       (run)="startEvaluation($event)"
-      [instruction]="'CSV file with at least \'query\' and \'golden\' columns'"
+      [instruction]="'CSV file with required \'query\' and \'golden\' columns (plus optional \'conversation_id\' and consecutive \'turn\' columns starting at 0 or 1 for multi-turn evaluation)'"
       [buttonText]="'Run Evaluation'"
       [requiredColumns]="['query', 'golden']"
     ></app-file-upload>
