@@ -72,11 +72,17 @@ export class CsvTableComponent implements OnChanges {
             row[col.hrefKey] :
             row[col.key];
       }
+      if ('projectId' in row) {
+        exportedRow['Project ID'] = row.projectId || '';
+      }
+      if ('region' in row) {
+        exportedRow['Region'] = row.region || '';
+      }
+      if ('engineId' in row) {
+        exportedRow['Engine ID'] = row.engineId || '';
+      }
       if ('assistToken' in row) {
         exportedRow['Assist Token'] = row.assistToken || '';
-      }
-      if ('traceId' in row) {
-        exportedRow['Trace ID'] = row.traceId || '';
       }
       return exportedRow;
     });

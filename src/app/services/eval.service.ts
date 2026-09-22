@@ -96,7 +96,10 @@ export class EvalService {
       body.generationSpec = {modelId: config.selectedModel};
     }
 
-    const projectId = config.projectId;
+    const projectId = config.projectId.trim();
+    if (!projectId) {
+      throw new Error('Project ID is required.');
+    }
     const region = config.region;
     const engineId = config.selectedEngine;
 
@@ -110,7 +113,6 @@ export class EvalService {
     let sessionInfo: SessionInfo|undefined;
     const citations: Array<{title?: string; uri?: string}> = [];
     const seenCitations = new Set<string>();
-    let traceId: string|undefined;
 
     try {
       onProgress?.('fetch');
@@ -119,14 +121,6 @@ export class EvalService {
         region: config.region,
         body
       });
-
-      const traceHeader = response.headers.get('x-cloud-trace-context');
-      if (traceHeader) {
-        const match = traceHeader.match(/^([a-fA-F0-9]{32})/);
-        if (match) {
-          traceId = match[1];
-        }
-      }
 
       if (!response.ok) {
         if (response.status === 429) {
@@ -256,7 +250,7 @@ export class EvalService {
         }
       }
 
-      const finalTraceUrl = this.getTraceUrl(traceId, assistToken, projectId);
+      const finalTraceUrl = this.getTraceUrl(assistToken, projectId);
 
       return {
         query: row.query,
@@ -273,13 +267,12 @@ export class EvalService {
         scoreError,
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
-        traceId,
         traceUrl: finalTraceUrl
       };
 
     } catch (error) {
       console.error('Error processing row:', error);
-      const finalTraceUrl = this.getTraceUrl(traceId, assistToken, projectId);
+      const finalTraceUrl = this.getTraceUrl(assistToken, projectId);
 
       return {
         query: row.query,
@@ -295,25 +288,32 @@ export class EvalService {
         engineId,
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
-        traceId,
         traceUrl: finalTraceUrl
       };
     }
   }
 
   private getTraceUrl(
-      traceId?: string,
-      assistToken?: string,
-      projectId?: string,
+      assistToken: string|undefined,
+      projectId: string,
       ): string|undefined {
-    if (traceId) {
-      return `https://console.cloud.google.com/traces/explorer?project=${
-          projectId}&tid=${traceId}`;
-    }
-    if (assistToken && assistToken !== 'unknown') {
-      return `https://console.cloud.google.com/traces/explorer?project=${
-          projectId}&query=gemini_enterprise.assist_token%3D${
-          encodeURIComponent(assistToken)}`;
+    if (assistToken && assistToken !== 'unknown' && projectId.trim()) {
+      const queryJson = JSON.stringify({
+        plotType: 'HEATMAP',
+        timeSeriesQuery: {
+          traceQuery: {
+            spanDataValue: 'SPAN_DURATION',
+            spanFilters: {
+              attributes: [{
+                key: 'gemini_enterprise.assist_token',
+                value: [assistToken],
+              }],
+            },
+          },
+        },
+      });
+      return `https://console.cloud.google.com/traces/explorer;query=${
+          encodeURIComponent(queryJson)};duration=P30D?project=${projectId.trim()}`;
     }
     return undefined;
   }

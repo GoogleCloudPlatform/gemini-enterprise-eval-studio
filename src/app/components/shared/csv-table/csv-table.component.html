@@ -84,7 +84,7 @@
                 rel="noopener noreferrer"
                 class="text-blue-600 hover:text-blue-800 underline"
               >
-                {{ row[col.key] || col.linkText || col.header || 'Link' }}
+                {{ col.linkText || row[col.key] || col.header || 'Link' }}
               </a>
             </div>
 

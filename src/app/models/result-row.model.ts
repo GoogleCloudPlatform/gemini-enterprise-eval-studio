@@ -33,7 +33,6 @@ export interface ResultRow {
   region?: string;
   engineId?: string;
   scoreError?: string;
-  traceId?: string;
   traceUrl?: string;
   /** Conversation grouping id, present only for multi-turn rows. */
   conversationId?: string;

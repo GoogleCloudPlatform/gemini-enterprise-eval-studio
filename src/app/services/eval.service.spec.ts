@@ -378,35 +378,7 @@ describe('EvalService', () => {
       expect(result.fetched).toContain('[1] Doc 2 - https://example.com/2');
     });
 
-    it('should extract traceId and traceUrl from the response headers using regex',
-       async () => {
-         const traceHeaderVal =
-             '0123456789abcdef0123456789abcdef/span-id-abc;o=1';
-         mockBackendService.callAssistSpy.and.returnValue(
-             Promise.resolve(new Response(
-                 JSON.stringify([{
-                   answer: {
-                     replies: [{
-                       groundedContent:
-                           {content: {text: 'Response from assist'}}
-                     }]
-                   }
-                 }]),
-                 {headers: {'x-cloud-trace-context': traceHeaderVal}})));
-
-         spyOn(service['stateService'], 'getCurrentConfig')
-             .and.returnValue(config);
-
-         const result =
-             await service.processRow({query: 'my query', golden: 'my golden'});
-
-         expect(result.traceId).toBe('0123456789abcdef0123456789abcdef');
-         expect(result.traceUrl)
-             .toBe(
-                 'https://console.cloud.google.com/traces/explorer?project=project&tid=0123456789abcdef0123456789abcdef');
-       });
-
-    it('should generate fallback traceUrl with query when x-cloud-trace-context is missing',
+    it('should generate traceUrl with query when assistToken is present',
        async () => {
          mockBackendService.callAssistSpy.and.returnValue(
              Promise.resolve(new Response(JSON.stringify([{
@@ -424,32 +396,50 @@ describe('EvalService', () => {
          const result =
              await service.processRow({query: 'my query', golden: 'my golden'});
 
-         expect(result.traceId).toBeUndefined();
+         const expectedQueryJson = JSON.stringify({
+           plotType: 'HEATMAP',
+           timeSeriesQuery: {
+             traceQuery: {
+               spanDataValue: 'SPAN_DURATION',
+               spanFilters: {
+                 attributes: [{
+                   key: 'gemini_enterprise.assist_token',
+                   value: ['my-assist-token-123'],
+                 }],
+               },
+             },
+           },
+         });
          expect(result.traceUrl)
              .toBe(
-                 'https://console.cloud.google.com/traces/explorer?project=project&query=gemini_enterprise.assist_token%3Dmy-assist-token-123');
+                 `https://console.cloud.google.com/traces/explorer;query=${encodeURIComponent(expectedQueryJson)};duration=P30D?project=project`);
        });
 
-    it('should handle gracefully when both header and assist token are missing',
-       async () => {
-         mockBackendService.callAssistSpy.and.returnValue(
-             Promise.resolve(new Response(JSON.stringify([{
-               answer: {
-                 replies: [
-                   {groundedContent: {content: {text: 'Response from assist'}}}
-                 ]
-               }
-             }]))));
+    it('should handle gracefully when assist token is missing', async () => {
+      mockBackendService.callAssistSpy.and.returnValue(
+          Promise.resolve(new Response(JSON.stringify([{
+            answer: {
+              replies:
+                  [{groundedContent: {content: {text: 'Response from assist'}}}]
+            }
+          }]))));
 
-         spyOn(service['stateService'], 'getCurrentConfig')
-             .and.returnValue(config);
+      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
 
-         const result =
-             await service.processRow({query: 'my query', golden: 'my golden'});
+      const result =
+          await service.processRow({query: 'my query', golden: 'my golden'});
 
-         expect(result.traceId).toBeUndefined();
-         expect(result.traceUrl).toBeUndefined();
-       });
+      expect(result.traceUrl).toBeUndefined();
+    });
+
+    it('should throw an error when projectId is empty', async () => {
+      spyOn(service['stateService'], 'getCurrentConfig')
+          .and.returnValue({...config, projectId: '   '});
+
+      await expectAsync(
+          service.processRow({query: 'my query', golden: 'my golden'}))
+          .toBeRejectedWithError('Project ID is required.');
+    });
   });
 
   describe('processRow session handling', () => {

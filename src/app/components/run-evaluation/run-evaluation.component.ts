@@ -70,9 +70,8 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
     {header: 'TTLT (s)', key: 'ttlt', type: 'number'},
     {header: 'Score', key: 'score', type: 'score'}, {
       header: 'Trace',
-      key: 'traceId',
+      key: 'traceUrl',
       type: 'link',
-      hrefKey: 'traceUrl',
       linkText: 'View Trace'
     }
   ];

@@ -49,9 +49,8 @@ export class RunQueriesComponent {
     {header: 'TTFA (s)', key: 'ttfa', type: 'number'},
     {header: 'TTLT (s)', key: 'ttlt', type: 'number'}, {
       header: 'Trace',
-      key: 'traceId',
+      key: 'traceUrl',
       type: 'link',
-      hrefKey: 'traceUrl',
       linkText: 'View Trace'
     }
   ];
@@ -150,7 +149,6 @@ export class RunQueriesComponent {
         projectId: result.projectId,
         region: result.region,
         engineId: result.engineId,
-        traceId: result.traceId,
         traceUrl: result.traceUrl
       };
 
