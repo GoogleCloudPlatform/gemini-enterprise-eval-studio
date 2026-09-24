@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import {ScorerRunResult} from '../scoring/scorer';
+
 /**
  * Represents a row in the evaluation results.
  */
@@ -28,6 +30,11 @@ export interface ResultRow {
   /** Time to Last Token in seconds (s). */
   ttlt: number;
   score: number;
+  /**
+   * One entry per scorer that ran, in run order. `scorerResults[0]` is the
+   * primary scorer; read its id, score and error from there.
+   */
+  scorerResults?: ScorerRunResult[];
   assistToken?: string;
   projectId?: string;
   region?: string;

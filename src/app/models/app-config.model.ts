@@ -22,6 +22,12 @@ export interface AppConfig {
   region: string;
   selectedEngine: string;
   selectedModel: string;
+  /**
+   * Identifiers of the scoring strategies to run against every row, in the
+   * order they are applied. Falls back to the first registered scorer when
+   * empty or unset. See scoring/scorer.registry.ts.
+   */
+  selectedScorers?: string[];
   autoRaterModel: string;
   autoRaterInstruction: string;
   selectedDataStores: string[];
