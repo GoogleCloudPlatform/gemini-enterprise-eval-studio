@@ -142,6 +142,7 @@ export class RunQueriesComponent {
       results[rowIndex] = {
         query: result.query,
         response: result.fetched,
+        thoughts: result.thoughts,
         ttft: result.ttft,
         ttfa: result.ttfa,
         ttlt: result.ttlt,

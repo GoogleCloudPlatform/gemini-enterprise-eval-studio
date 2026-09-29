@@ -72,6 +72,9 @@ export class CsvTableComponent implements OnChanges {
             row[col.hrefKey] :
             row[col.key];
       }
+      if ('thoughts' in row) {
+        exportedRow['Thoughts'] = row.thoughts || '';
+      }
       if ('projectId' in row) {
         exportedRow['Project ID'] = row.projectId || '';
       }

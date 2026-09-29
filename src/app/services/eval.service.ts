@@ -29,6 +29,16 @@ interface SessionInfo {
   [key: string]: unknown;
 }
 
+interface StreamState {
+  startTime: number;
+  ttft: number;
+  ttfa: number;
+  fullText: string;
+  thoughts: string[];
+  isFirstChunk: boolean;
+  isFirstUserChunk: boolean;
+}
+
 interface AssistRequestBody {
   query: {text: string};
   session?: string;
@@ -103,13 +113,16 @@ export class EvalService {
     const region = config.region;
     const engineId = config.selectedEngine;
 
-    const startTime = Date.now();
-    let ttft = 0;
-    let ttfa = 0;
-    let fullText = '';
+    const streamState: StreamState = {
+      startTime: Date.now(),
+      ttft: 0,
+      ttfa: 0,
+      fullText: '',
+      thoughts: [],
+      isFirstChunk: true,
+      isFirstUserChunk: true,
+    };
     let assistToken = '';
-    let isFirstChunk = true;
-    let isFirstUserChunk = true;
     let sessionInfo: SessionInfo|undefined;
     const citations: Array<{title?: string; uri?: string}> = [];
     const seenCitations = new Set<string>();
@@ -185,32 +198,12 @@ export class EvalService {
               if (item.answer?.state === 'SKIPPED') {
                 const reason =
                     item.answer?.assistSkippedReasons?.[0] || 'Unknown reason';
-                fullText = `SKIPPED: ${reason}`;
+                streamState.fullText = `SKIPPED: ${reason}`;
                 break;
               }
               const replies = item.answer?.replies || [];
               for (const reply of replies) {
-                const content = reply.groundedContent?.content;
-                if (content) {
-                  const text = content.text;
-                  const thought = content.thought;
-
-                  if (text || thought) {
-                    if (isFirstChunk) {
-                      ttft = Date.now() - startTime;
-                      isFirstChunk = false;
-                    }
-
-                    if (!thought && text && isFirstUserChunk) {
-                      ttfa = Date.now() - startTime;
-                      isFirstUserChunk = false;
-                    }
-
-                    if (text && !thought) {
-                      fullText += text;
-                    }
-                  }
-                }
+                this.processReply(reply, streamState);
               }
             }
           }
@@ -219,31 +212,31 @@ export class EvalService {
         }
       }
 
-      if (citations.length > 0 && !fullText.startsWith('SKIPPED:')) {
-        const trimmed = fullText.trimEnd();
-        fullText = trimmed + '\n\nSources:\n\n';
+      if (citations.length > 0 && !streamState.fullText.startsWith('SKIPPED:')) {
+        const trimmed = streamState.fullText.trimEnd();
+        streamState.fullText = trimmed + '\n\nSources:\n\n';
         for (let i = 0; i < citations.length; i++) {
           const cit = citations[i];
           const index = i + 1;
           if (cit.title && cit.uri && cit.title !== cit.uri) {
-            fullText += `[${index}] ${cit.title} - ${cit.uri}\n\n`;
+            streamState.fullText += `[${index}] ${cit.title} - ${cit.uri}\n\n`;
           } else if (cit.title) {
-            fullText += `[${index}] ${cit.title}\n\n`;
+            streamState.fullText += `[${index}] ${cit.title}\n\n`;
           } else if (cit.uri) {
-            fullText += `[${index}] ${cit.uri}\n\n`;
+            streamState.fullText += `[${index}] ${cit.uri}\n\n`;
           }
         }
-        fullText = fullText.trimEnd();
+        streamState.fullText = streamState.fullText.trimEnd();
       }
 
-      const ttlt = Date.now() - startTime;
+      const ttlt = Date.now() - streamState.startTime;
 
       let score = 0;
       let scoreError: string | undefined;
       if (row.golden) {        onProgress?.('score');
         try {
-          score =
-              await this.scoreResponse(row.query, fullText, row.golden, config);
+          score = await this.scoreResponse(
+              row.query, streamState.fullText, row.golden, config);
         } catch (error) {
           console.error('Error scoring response during evaluation:', error);
           scoreError = (error as Error).message;
@@ -255,9 +248,10 @@ export class EvalService {
       return {
         query: row.query,
         golden: row.golden || '',
-        fetched: fullText,
-        ttft: Number((ttft / 1000).toFixed(2)),
-        ttfa: Number((ttfa / 1000).toFixed(2)),
+        fetched: streamState.fullText,
+        thoughts: streamState.thoughts.join('\n'),
+        ttft: Number((streamState.ttft / 1000).toFixed(2)),
+        ttfa: Number((streamState.ttfa / 1000).toFixed(2)),
         ttlt: Number((ttlt / 1000).toFixed(2)),
         score,
         assistToken,
@@ -278,6 +272,7 @@ export class EvalService {
         query: row.query,
         golden: row.golden || '',
         fetched: 'Error: ' + error,
+        thoughts: streamState.thoughts.join('\n'),
         ttft: 0,
         ttfa: 0,
         ttlt: 0,
@@ -290,6 +285,42 @@ export class EvalService {
         turnId: sessionInfo?.turnId,
         traceUrl: finalTraceUrl
       };
+    }
+  }
+
+  /**
+   * Processes a single reply from a streamAssist chunk, updating timing
+   * metrics, answer text, and thinking traces.
+   */
+  private processReply(reply: any, state: StreamState): void {
+    const content = reply?.groundedContent?.content;
+    if (!content) return;
+
+    const text = typeof content.text === 'string' ? content.text : '';
+    const thought = Boolean(content.thought);
+    if (!text && !thought) return;
+
+    if (state.isFirstChunk) {
+      state.ttft = Date.now() - state.startTime;
+      state.isFirstChunk = false;
+    }
+
+    if (!thought && text && state.isFirstUserChunk) {
+      state.ttfa = Date.now() - state.startTime;
+      state.isFirstUserChunk = false;
+    }
+
+    if (text && !thought) {
+      state.fullText += text;
+    }
+
+    if (text && thought) {
+      // Each streamed thought is its own reply, so internal newlines are
+      // folded away rather than being mistaken for extra thoughts.
+      const line = text.replace(/\s+/g, ' ').trim();
+      if (line) {
+        state.thoughts.push(line);
+      }
     }
   }
 

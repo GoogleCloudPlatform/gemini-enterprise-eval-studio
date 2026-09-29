@@ -23,6 +23,7 @@ export interface ResultRow {
   query: string;
   golden: string;
   fetched: string;
+  thoughts?: string;
   /** Time to First Token in seconds (s). */
   ttft: number;
   /** Time to First Answer Token in seconds (s). */

@@ -205,6 +205,147 @@ describe('EvalService', () => {
       enableWebSearch: false
     };
 
+    /**
+     * A streamed assist response carrying one reply per given content, so a
+     * test can interleave thought and answer fragments the way the API does.
+     */
+    function streamed(...contents: Array<Record<string, unknown>>):
+        Promise<Response> {
+      return Promise.resolve(new Response(JSON.stringify(contents.map(
+          content => ({answer: {replies: [{groundedContent: {content}}]}})))));
+    }
+
+    it('should collect the thinking trace one thought per line, keeping it out of the fetched answer',
+       async () => {
+         mockBackendService.callAssistSpy.and.returnValue(streamed(
+             {text: '**Calculating Server Costs**\n', thought: true},
+             {text: '**Summing Server Rates**\n', thought: true},
+             {text: 'The total is '},
+             {text: '$1093.50.'},
+             ));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.thoughts)
+             .toBe('**Calculating Server Costs**\n**Summing Server Rates**');
+         expect(result.fetched).toBe('The total is $1093.50.');
+       });
+
+    it('should keep thoughts on their own line when they arrive after answer text',
+       async () => {
+         // The API documents no ordering between thought and answer replies,
+         // so the trace must not depend on thoughts arriving first.
+         mockBackendService.callAssistSpy.and.returnValue(streamed(
+             {text: 'first ', thought: true},
+             {text: 'answer'},
+             {text: 'second\nwrapped', thought: true},
+             ));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.thoughts).toBe('first\nsecond wrapped');
+         expect(result.fetched).toBe('answer');
+       });
+
+    it('should trim and fold multiple combined newlines from the start, middle, and end of a thought',
+       async () => {
+         mockBackendService.callAssistSpy.and.returnValue(streamed(
+             {
+               text: '\n\n\n**Step 1:**\n\n\nAnalyzing   query\n\n\tdetails\n\n\n',
+               thought: true,
+             },
+             {text: '\n\n   \n\n', thought: true},
+             {
+               text: '\r\n\r\n**Step 2:**\n\nSynthesizing\r\n\r\nresults\n\n',
+               thought: true,
+             },
+             {text: 'Final answer.'},
+             ));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.thoughts)
+             .toBe(
+                 '**Step 1:** Analyzing query details\n**Step 2:** Synthesizing results');
+         expect(result.fetched).toBe('Final answer.');
+       });
+
+    it('should safely ignore non-string text values in thought and answer replies',
+       async () => {
+         mockBackendService.callAssistSpy.and.returnValue(streamed(
+             {text: 12345, thought: true},
+             {text: {unexpected: 'object'}, thought: true},
+             {text: '**Valid Thought**\n', thought: true},
+             {text: 67890},
+             {text: 'Valid answer.'},
+             ));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.thoughts).toBe('**Valid Thought**');
+         expect(result.fetched).toBe('Valid answer.');
+       });
+
+    it('should set an empty thinking trace when the model emits no thoughts',
+       async () => {
+         // Required so the CSV export, whose header comes from the first row
+         // alone, still emits the column for a run on a non-thinking model.
+         mockBackendService.callAssistSpy.and.returnValue(
+             streamed({text: 'answer'}));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.thoughts).toBe('');
+       });
+
+    it('should keep the thinking trace collected before a failure', async () => {
+      let chunkSent = false;
+      const stream = new ReadableStream({
+        pull(controller) {
+          if (!chunkSent) {
+            chunkSent = true;
+            const chunk =
+                '[{"answer":{"replies":[{"groundedContent":{"content":{"text":"**Analyzing Request**\\n","thought":true}}}]}}';
+            controller.enqueue(new TextEncoder().encode(chunk));
+          } else {
+            controller.error(new Error('Stream disconnected'));
+          }
+        }
+      });
+      mockBackendService.callAssistSpy.and.returnValue(
+          Promise.resolve(new Response(stream)));
+      spyOn(service['stateService'], 'getCurrentConfig')
+          .and.returnValue(config);
+
+      const result = await service.processRow({query: 'q', golden: 'g'});
+
+      expect(result.thoughts).toBe('**Analyzing Request**');
+      expect(result.fetched).toContain('Error:');
+    });
+
+    it('should initialize an empty thinking trace when HTTP request fails immediately',
+       async () => {
+         mockBackendService.callAssistSpy.and.returnValue(
+             Promise.resolve(new Response('', {status: 500})));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.thoughts).toBe('');
+         expect(result.fetched).toContain('Error:');
+       });
+
     it('should preserve the fetched text if scoring throws an error', async () => {
       mockBackendService.callAssistSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify([{
         answer: {
