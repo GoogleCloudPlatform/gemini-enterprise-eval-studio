@@ -64,6 +64,13 @@ architecture:
     - **SAML**: No credentials or tokens are stored in Firestore. SAML authentication assertions are processed statelessly without storing refresh tokens.
     - **Google Identity & 3P OIDC**: If server-side token storage in Firestore is enabled (`firestore_config`), user refresh tokens are stored in your GCP project's Firestore database. Administrators can configure `firestore_config.ttlSeconds` to control how long refresh tokens remain valid/stored before users are required to sign in again (defaults to 7 days).
     - **Firestore Purge Latency**: Expired tokens in Firestore are automatically purged under a TTL policy, which typically deletes expired documents within 24–72 hours of expiration. Please ensure this retention window satisfies your compliance requirements.
+5.  **Exported Data Responsibility**: Query and evaluation results exported to
+    CSV may contain Customer Core Content (such as queries, golden responses,
+    model responses, and scores). Once downloaded, these files are stored on
+    your local filesystem, outside of your Google Cloud environment. You are
+    solely responsible for securing and protecting exported files in accordance
+    with your organization's data handling policies, including restricting
+    access, storing them securely, and deleting them when no longer needed.
 
 ## Prerequisites & Setup
 
