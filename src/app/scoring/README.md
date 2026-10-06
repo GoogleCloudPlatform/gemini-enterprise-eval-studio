@@ -15,8 +15,9 @@ between `0.0` and `1.0`.
 `AppConfig.selectedScorers` through `ScorerRegistry` and delegates to it.
 
 The scoring controls themselves live in a single component,
-`components/shared/scoring-setup`, so anything a scorer contributes shows up
-wherever the scoring setup is offered.
+`components/shared/scoring-setup`, which is rendered both by the configuration
+form and by the re-rate dialog on the results step. Anything a scorer
+contributes therefore shows up in both places automatically.
 
 ## Adding a scorer
 
@@ -51,7 +52,8 @@ automatically: the **Scoring Methods** list appears as soon as more than one
 scorer is registered, and the first entry in the list is the default. The
 factory must return at least one scorer; an empty list fails to compile. At
 least one scoring method must stay selected; clearing them all surfaces an
-inline error and disables the **Next** button.
+inline error and disables the **Next** button (and the **Re-rate** button in
+the re-rate dialog).
 
 ## Calling a model
 

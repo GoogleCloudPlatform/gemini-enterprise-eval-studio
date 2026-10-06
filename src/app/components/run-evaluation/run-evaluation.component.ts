@@ -16,21 +16,23 @@
 
 import {CommonModule} from '@angular/common';
 import {ChangeDetectorRef, Component, OnDestroy, OnInit} from '@angular/core';
-import {FormsModule} from '@angular/forms';
 import {Subject} from 'rxjs';
 import {distinctUntilChanged, map, takeUntil} from 'rxjs/operators';
 
+import {AppConfig} from '../../models/app-config.model';
 import {CSVRow} from '../../models/csv-row.model';
 import {ResultRow} from '../../models/result-row.model';
 import {scoreColumnHeader, scoreErrorColumnHeader} from '../../scoring/score-columns';
 import {Scorer, ScorerRunResult, firstScorerError} from '../../scoring/scorer';
 import {ScorerRegistry} from '../../scoring/scorer.registry';
+import {ScorerSelection} from '../../scoring/scorer-selection';
 import {EvalService} from '../../services/eval.service';
 import {StateService} from '../../services/state.service';
 import {ConfigFormComponent} from '../shared/config-form/config-form.component';
 import {ColumnDef, CsvTableComponent} from '../shared/csv-table/csv-table.component';
 import {FileUploadComponent} from '../shared/file-upload/file-upload.component';
 import {ProgressBarComponent} from '../shared/progress-bar/progress-bar.component';
+import {ScoringSetupComponent} from '../shared/scoring-setup/scoring-setup.component';
 
 const MAX_CONCURRENT_REQUESTS_FOR_EVALUATION = 5;
 
@@ -81,7 +83,7 @@ function sameIds(
   standalone: true,
   imports: [
     CommonModule, ConfigFormComponent, FileUploadComponent, CsvTableComponent,
-    ProgressBarComponent, FormsModule
+    ProgressBarComponent, ScoringSetupComponent
   ],
   templateUrl: './run-evaluation.component.html'
 })
@@ -94,11 +96,27 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
   uploadedRows: any[] = [];
   totalRows = 0;
   completedRows = 0;
-  showReRateModal = false;
-  reRateInstruction = '';
+  /**
+   * A draft copy of the run configuration for the re-rate dialog to edit.
+   * Null while the dialog is closed. Cancelling discards the draft; re-rating
+   * saves it.
+   */
+  reRateConfig: AppConfig|null = null;
+  /** Names of the scoring methods selected in the re-rate dialog. */
+  selectedScorersLabel = '';
+  /**
+   * Why the re-rate dialog's scoring setup cannot run, or null if it can.
+   * Uses the same validation as the configuration form.
+   */
+  reRateValidationError: string|null = null;
   errorMessage: string | null = null;
   private readonly destroy$ = new Subject<void>();
   private currentRunId = 0;
+  /**
+   * Whether the current click started with a press on the re-rate dialog's
+   * backdrop, so a text selection dragged out of the dialog does not close it.
+   */
+  private reRateBackdropPressed = false;
 
   /**
    * Every column the results table can show. `columns` hides the
@@ -129,7 +147,9 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
 
   constructor(
       private stateService: StateService, private evalService: EvalService,
-      private scorerRegistry: ScorerRegistry, private cdr: ChangeDetectorRef) {}
+      private scorerRegistry: ScorerRegistry,
+      private scorerSelection: ScorerSelection, private cdr: ChangeDetectorRef) {
+  }
 
   ngOnInit() {
     // config$ emits on every form edit; only a change of scorer selection
@@ -370,28 +390,87 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
         this.stateService.getCurrentConfig().selectedScorers);
   }
 
-  /** Opens the re-rate modal and loads active instructions. */
+  /**
+   * Opens the re-rate dialog on a copy of the active configuration, so the
+   * whole scoring setup can be adjusted and then either applied or dropped.
+   */
   openReRateModal() {
-    const config = this.stateService.getCurrentConfig();
-    this.reRateInstruction = config.autoRaterInstruction || '';
-    this.showReRateModal = true;
+    const draft = structuredClone(this.stateService.getCurrentConfig());
+    this.scorerSelection.normalize(draft);
+    this.reRateConfig = draft;
+    this.refreshReRateDialog();
     this.cdr.detectChanges();
   }
 
-  /** Re-scores the current results without re-fetching the responses. */
+  /** Closes the re-rate dialog, discarding any unapplied edits. */
+  closeReRateModal() {
+    this.reRateConfig = null;
+    this.refreshReRateDialog();
+    this.cdr.detectChanges();
+  }
+
+  /**
+   * Recomputes the dialog's scorer names and validation error from the draft.
+   * Called on open and on every edit, rather than evaluating them from the
+   * template on each change detection pass.
+   */
+  refreshReRateDialog() {
+    const draft = this.reRateConfig;
+    this.selectedScorersLabel = draft ?
+        this.scorerSelection.selected(draft)
+            .map(scorer => scorer.displayName)
+            .join(', ') :
+        '';
+    this.reRateValidationError =
+        draft ? this.scorerSelection.validate(draft) ?? null : null;
+  }
+
+  /** Records whether a press on the re-rate overlay landed on the backdrop. */
+  onReRateBackdropMouseDown(event: MouseEvent) {
+    this.reRateBackdropPressed = event.target === event.currentTarget;
+  }
+
+  /**
+   * Closes the re-rate dialog when the backdrop around it is clicked. Clicks
+   * inside the dialog, or drags that start inside it, leave it open.
+   */
+  onReRateBackdropClick(event: MouseEvent) {
+    const onBackdrop =
+        this.reRateBackdropPressed && event.target === event.currentTarget;
+    this.reRateBackdropPressed = false;
+    if (onBackdrop) {
+      this.closeReRateModal();
+    }
+  }
+
+  /**
+   * Re-scores the current results with the re-rate dialog's scoring setup,
+   * without re-fetching the responses. Does nothing unless the dialog is open
+   * with a valid setup and no other run is in progress.
+   */
   async startReRate() {
-    if (this.isProcessing) return;
-    this.showReRateModal = false;
+    // The Re-rate button only exists inside the open dialog, so there is
+    // always a draft to apply.
+    const config = this.reRateConfig;
+    if (!config || this.isProcessing) return;
+    // The button is disabled while the setup is invalid, and the dialog shows
+    // why. Checking again keeps an empty selection from silently falling back
+    // to the default scorer.
+    if (this.scorerSelection.validate(config)) return;
+
+    // The dialog's edits become the run's configuration, so the results table
+    // and any later run agree on which methods were applied.
+    this.stateService.setConfig(config);
+    this.reRateConfig = null;
+    this.refreshReRateDialog();
+
     this.isProcessing = true;
     this.progress = 0;
     this.totalRows = this.results.length;
     this.completedRows = 0;
     this.cdr.detectChanges();
 
-    const config = this.stateService.getCurrentConfig();
-    config.autoRaterInstruction = this.reRateInstruction;
-    this.stateService.setConfig(config);
-    const scorers = this.getSelectedScorers();
+    const scorers = this.scorerSelection.selected(config);
 
     this.errorMessage = null;
     const newResults: ResultRow[] = [];

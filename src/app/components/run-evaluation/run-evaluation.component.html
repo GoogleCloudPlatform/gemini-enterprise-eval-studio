@@ -114,29 +114,38 @@
 </div>
 
 <!-- Re-rate Modal -->
-<div *ngIf="showReRateModal" class="fixed inset-0 z-50 overflow-y-auto bg-gray-500 bg-opacity-75 flex items-center justify-center p-4">
-  <div class="bg-white rounded-lg overflow-hidden shadow-xl transform transition-all max-w-lg w-full p-6 space-y-4">
+<div
+  *ngIf="reRateConfig as draft"
+  (mousedown)="onReRateBackdropMouseDown($event)"
+  (click)="onReRateBackdropClick($event)"
+  class="fixed inset-0 z-50 overflow-y-auto bg-gray-500 bg-opacity-75 flex items-center justify-center p-4"
+>
+  <div
+    role="dialog"
+    aria-modal="true"
+    aria-label="Re-rate Responses"
+    class="bg-white rounded-lg shadow-xl transform transition-all max-w-lg w-full max-h-full overflow-y-auto p-6 space-y-4"
+  >
     <h3 class="text-lg font-medium text-gray-900">Re-rate Responses</h3>
-    <p class="text-sm text-gray-500">Update the auto-rater instruction to re-score the current responses without re-fetching them.</p>
-    <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Auto Rater Instruction</label>
-      <textarea
-        [(ngModel)]="reRateInstruction"
-        rows="6"
-        class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-        placeholder="Enter evaluation instructions..."
-      ></textarea>
-    </div>
+    <p class="text-sm text-gray-500">
+      Adjust the scoring setup below and re-score the current responses with
+      {{ selectedScorersLabel }} without re-fetching them. Re-rating saves
+      these settings to the Run Evaluation configuration.
+    </p>
+    <app-scoring-setup
+      [config]="draft"
+      (configChange)="refreshReRateDialog()"
+    ></app-scoring-setup>
     <div class="flex justify-end space-x-3">
       <button
-        (click)="showReRateModal = false"
+        (click)="closeReRateModal()"
         class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-50 transition-colors font-medium"
       >
         Cancel
       </button>
       <button
         (click)="startReRate()"
-        [disabled]="!reRateInstruction"
+        [disabled]="!!reRateValidationError"
         class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-4 py-2 rounded-md hover:from-blue-700 hover:to-purple-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Re-rate

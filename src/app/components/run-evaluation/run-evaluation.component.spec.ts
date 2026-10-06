@@ -15,7 +15,7 @@
  */
 
 import {HttpClientTestingModule} from '@angular/common/http/testing';
-import {TestBed, fakeAsync, tick} from '@angular/core/testing';
+import {ComponentFixture, TestBed, fakeAsync, tick} from '@angular/core/testing';
 import {BehaviorSubject, of} from 'rxjs';
 
 import {AppConfig} from '../../models/app-config.model';
@@ -871,6 +871,17 @@ describe('RunEvaluationComponent', () => {
   });
 
   describe('startReRate', () => {
+    beforeEach(() => {
+      // Scorers without required inputs, so the dialog's draft is valid as
+      // seeded and the tests can focus on the re-scoring itself.
+      TestBed.overrideProvider(SCORERS, {
+        useValue: [
+          new FakeScorer('first', 'First'),
+          new FakeScorer('second', 'Second'),
+        ],
+      });
+    });
+
     it('should re-score every row with all selected scorers', fakeAsync(() => {
          const fixture = TestBed.createComponent(RunEvaluationComponent);
          const component = fixture.componentInstance;
@@ -901,6 +912,7 @@ describe('RunEvaluationComponent', () => {
            {scorerId: 'second', displayName: 'Second', score: 0.8},
          ]);
 
+         component.openReRateModal();
          component.startReRate();
          tick();
 
@@ -952,6 +964,7 @@ describe('RunEvaluationComponent', () => {
            error: 'quota exceeded'
          }]);
 
+         component.openReRateModal();
          component.startReRate();
          tick();
 
@@ -976,12 +989,309 @@ describe('RunEvaluationComponent', () => {
            scorerResults: []
          }]);
 
+         component.openReRateModal();
          component.startReRate();
          tick();
 
          expect(mockEvalService.scoreAll).not.toHaveBeenCalled();
          expect(resultsSubject.value[0].scorerResults?.[0].skipped).toBeTrue();
        }));
+
+    it('should do nothing while another run is in progress', fakeAsync(() => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+         resultsSubject.next([{
+           query: 'q1',
+           golden: 'g1',
+           fetched: 'f1',
+           ttft: 1,
+           ttfa: 2,
+           ttlt: 3,
+           scorerResults: scored(0.1)
+         }]);
+         component.openReRateModal();
+         component.isProcessing = true;
+         mockStateService.setConfig.calls.reset();
+         mockStateService.setResults.calls.reset();
+
+         component.startReRate();
+         tick();
+
+         expect(mockEvalService.scoreAll).not.toHaveBeenCalled();
+         expect(mockStateService.setConfig).not.toHaveBeenCalled();
+         expect(mockStateService.setResults).not.toHaveBeenCalled();
+         // The dialog keeps its draft so nothing the user picked is lost.
+         expect(component.reRateConfig).not.toBeNull();
+         expect(component.isProcessing).toBeTrue();
+       }));
+
+    it('should do nothing when the re-rate dialog is not open', fakeAsync(() => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+         resultsSubject.next([{
+           query: 'q1',
+           golden: 'g1',
+           fetched: 'f1',
+           ttft: 1,
+           ttfa: 2,
+           ttlt: 3,
+           scorerResults: scored(0.1)
+         }]);
+         mockStateService.setResults.calls.reset();
+
+         component.startReRate();
+         tick();
+
+         expect(mockEvalService.scoreAll).not.toHaveBeenCalled();
+         expect(mockStateService.setResults).not.toHaveBeenCalled();
+         expect(component.isProcessing).toBeFalse();
+       }));
+  });
+
+  describe('re-rate dialog scoring setup', () => {
+    let fixture: ComponentFixture<RunEvaluationComponent>;
+    let component: RunEvaluationComponent;
+
+    beforeEach(() => {
+      TestBed.overrideProvider(SCORERS, {
+        useValue: [
+          new FakeScorer('a', 'A', ['autoRaterInstruction']),
+          new FakeScorer('b', 'B')
+        ]
+      });
+      fixture = TestBed.createComponent(RunEvaluationComponent);
+      component = fixture.componentInstance;
+      fixture.detectChanges();
+      // The configuration form on step 1 persists its normalized selection as
+      // it initializes; only what the dialog does is of interest here.
+      mockStateService.setConfig.calls.reset();
+    });
+
+    /** The open re-rate dialog, if any. */
+    function dialog(): HTMLElement|null {
+      return fixture.nativeElement.querySelector('[role="dialog"]');
+    }
+
+    /**
+     * The scoring method checkboxes rendered by the dialog, in DOM order. The
+     * configuration form on step 1 renders the same picker, so the query is
+     * scoped to the dialog.
+     */
+    function checkboxes(): HTMLInputElement[] {
+      const open = dialog();
+      if (!open) {
+        return [];
+      }
+      return Array.from(
+          open.querySelectorAll('input[type="checkbox"][aria-label]') as
+          NodeListOf<HTMLInputElement>);
+    }
+
+    /** The dialog's Re-rate button. */
+    function reRateButton(): HTMLButtonElement {
+      const buttons = Array.from(
+          dialog()!.querySelectorAll('button') as
+          NodeListOf<HTMLButtonElement>);
+      return buttons.find(button => button.textContent?.trim() === 'Re-rate')!;
+    }
+
+    /** The overlay behind the open dialog. */
+    function backdrop(): HTMLElement {
+      return dialog()!.parentElement!;
+    }
+
+    /**
+     * Presses the mouse on one element and releases it so that the click lands
+     * on another, as a browser does for a drag.
+     */
+    function pressAndClick(pressed: HTMLElement, clicked: HTMLElement) {
+      pressed.dispatchEvent(new MouseEvent('mousedown', {bubbles: true}));
+      clicked.dispatchEvent(new MouseEvent('click', {bubbles: true}));
+    }
+
+    it('should offer every scoring method once the dialog is open', () => {
+      expect(checkboxes().length).toBe(0);
+
+      component.openReRateModal();
+      fixture.detectChanges();
+
+      expect(checkboxes().map(input => input.getAttribute('aria-label')))
+          .toEqual(['A', 'B']);
+      // Seeded from the active configuration, which names no method yet and so
+      // falls back to the default.
+      expect(checkboxes().map(input => input.checked)).toEqual([true, false]);
+      expect(component.reRateConfig!.selectedScorers).toEqual(['a']);
+    });
+
+    it('should leave the run configuration alone until the re-rate starts',
+       () => {
+         component.openReRateModal();
+         fixture.detectChanges();
+
+         checkboxes()[1].click();
+         fixture.detectChanges();
+
+         expect(component.reRateConfig!.selectedScorers).toEqual(['a', 'b']);
+         expect(mockStateService.setConfig).not.toHaveBeenCalled();
+       });
+
+    it('should discard the edited scoring setup when cancelled', () => {
+      component.openReRateModal();
+      fixture.detectChanges();
+      checkboxes()[1].click();
+
+      component.closeReRateModal();
+      fixture.detectChanges();
+
+      expect(component.reRateConfig).toBeNull();
+      expect(checkboxes().length).toBe(0);
+      expect(configSubject.value.selectedScorers).toBeUndefined();
+      expect(mockStateService.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('should re-score with the scoring methods picked in the dialog',
+       fakeAsync(() => {
+         resultsSubject.next([{
+           query: 'q1',
+           golden: 'g1',
+           fetched: 'f1',
+           ttft: 1,
+           ttfa: 2,
+           ttlt: 3,
+           scorerResults: scored(0.1)
+         }]);
+         mockEvalService.scoreAll.and.callFake(async () => [
+           {scorerId: 'a', displayName: 'A', score: 0.9},
+           {scorerId: 'b', displayName: 'B', score: 0.8},
+         ]);
+
+         component.openReRateModal();
+         fixture.detectChanges();
+         checkboxes()[1].click();
+         component.startReRate();
+         tick();
+
+         expect(mockStateService.setConfig)
+             .toHaveBeenCalledWith(
+                 jasmine.objectContaining({selectedScorers: ['a', 'b']}));
+         expect(mockEvalService.scoreAll)
+             .toHaveBeenCalledWith(jasmine.objectContaining({
+               config: jasmine.objectContaining({selectedScorers: ['a', 'b']})
+             }));
+         expect(component.reRateConfig).toBeNull();
+       }));
+
+    it('should re-score with an instruction edited in the dialog',
+       fakeAsync(() => {
+         resultsSubject.next([{
+           query: 'q1',
+           golden: 'g1',
+           fetched: 'f1',
+           ttft: 1,
+           ttfa: 2,
+           ttlt: 3,
+           scorerResults: scored(0.1)
+         }]);
+         mockEvalService.scoreAll.and.callFake(
+             async () => [{scorerId: 'a', displayName: 'A', score: 0.9}]);
+
+         component.openReRateModal();
+         component.reRateConfig!.autoRaterInstruction = 'Be strict.';
+         component.startReRate();
+         tick();
+
+         expect(mockEvalService.scoreAll)
+             .toHaveBeenCalledWith(jasmine.objectContaining({
+               config:
+                   jasmine.objectContaining({autoRaterInstruction: 'Be strict.'})
+             }));
+       }));
+
+    it('should block the re-rate while no scoring method is selected', () => {
+      component.openReRateModal();
+      fixture.detectChanges();
+      expect(component.reRateValidationError).toBeNull();
+
+      checkboxes()[0].click();
+      fixture.detectChanges();
+
+      expect(component.reRateConfig!.selectedScorers).toEqual([]);
+      expect(component.reRateValidationError)
+          .toBe('Select at least one scoring method.');
+      expect(reRateButton().disabled).toBeTrue();
+    });
+
+    it('should not re-rate with an empty selection even if called directly',
+       fakeAsync(() => {
+         resultsSubject.next([{
+           query: 'q1',
+           golden: 'g1',
+           fetched: 'f1',
+           ttft: 1,
+           ttfa: 2,
+           ttlt: 3,
+           scorerResults: scored(0.1)
+         }]);
+         component.openReRateModal();
+         component.reRateConfig!.selectedScorers = [];
+
+         component.startReRate();
+         tick();
+
+         expect(mockEvalService.scoreAll).not.toHaveBeenCalled();
+         expect(mockStateService.setConfig).not.toHaveBeenCalled();
+         // The dialog stays open so its validation message stays visible.
+         expect(component.reRateConfig).not.toBeNull();
+         expect(resultsSubject.value[0].scorerResults).toEqual(scored(0.1));
+       }));
+
+    it('should name the selected scoring methods as they change', () => {
+      component.openReRateModal();
+      fixture.detectChanges();
+      expect(component.selectedScorersLabel).toBe('A');
+
+      checkboxes()[1].click();
+      fixture.detectChanges();
+
+      expect(component.selectedScorersLabel).toBe('A, B');
+      expect(dialog()!.textContent).toContain('A, B');
+    });
+
+    it('should close when the backdrop is clicked', () => {
+      component.openReRateModal();
+      fixture.detectChanges();
+
+      pressAndClick(backdrop(), backdrop());
+      fixture.detectChanges();
+
+      expect(component.reRateConfig).toBeNull();
+      expect(dialog()).toBeNull();
+      expect(mockStateService.setConfig).not.toHaveBeenCalled();
+    });
+
+    it('should stay open when the dialog itself is clicked', () => {
+      component.openReRateModal();
+      fixture.detectChanges();
+
+      pressAndClick(dialog()!, dialog()!);
+      fixture.detectChanges();
+
+      expect(component.reRateConfig).not.toBeNull();
+      expect(dialog()).not.toBeNull();
+    });
+
+    it('should stay open when a drag starts inside the dialog', () => {
+      component.openReRateModal();
+      fixture.detectChanges();
+
+      // Selecting text in the instruction and releasing over the backdrop
+      // fires the click on the backdrop.
+      pressAndClick(dialog()!, backdrop());
+      fixture.detectChanges();
+
+      expect(component.reRateConfig).not.toBeNull();
+    });
   });
 });
-
