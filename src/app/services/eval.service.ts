@@ -56,6 +56,9 @@ interface AssistRequestBody {
  */
 @Injectable({providedIn: 'root'})
 export class EvalService {
+  traceRetryMaxAttempts = 10;
+  traceRetryDelayMs = 2000;
+
   constructor(
       private readonly stateService: StateService,
       private readonly evalBackendService: EvalBackendService
@@ -69,8 +72,10 @@ export class EvalService {
    * @returns A promise that resolves to the ResultRow.
    */
   async processRow(
-      row: CSVRow, onProgress?: (step: 'fetch'|'score') => void,
-      session?: string): Promise<ResultRow> {
+      row: CSVRow,
+      onProgress?: (step: 'fetch'|'score') => void,
+      session?: string,
+  ): Promise<ResultRow> {
     const config = this.stateService.getCurrentConfig();
 
 
@@ -123,6 +128,7 @@ export class EvalService {
       isFirstUserChunk: true,
     };
     let assistToken = '';
+    let traceId: string|undefined;
     let sessionInfo: SessionInfo|undefined;
     const citations: Array<{title?: string; uri?: string}> = [];
     const seenCitations = new Set<string>();
@@ -230,6 +236,10 @@ export class EvalService {
       }
 
       const ttlt = Date.now() - streamState.startTime;
+      const traceIdPromise =
+          !traceId && assistToken && assistToken !== 'unknown' ?
+          this.resolveTraceId(projectId, assistToken) :
+          Promise.resolve(traceId);
 
       let score = 0;
       let scoreError: string | undefined;
@@ -243,7 +253,7 @@ export class EvalService {
         }
       }
 
-      const finalTraceUrl = this.getTraceUrl(assistToken, projectId);
+      traceId = await traceIdPromise;
 
       return {
         query: row.query,
@@ -261,13 +271,15 @@ export class EvalService {
         scoreError,
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
-        traceUrl: finalTraceUrl
+        traceId,
+        traceUrl: this.getTraceUrl(traceId, projectId),
       };
 
     } catch (error) {
       console.error('Error processing row:', error);
-      const finalTraceUrl = this.getTraceUrl(assistToken, projectId);
-
+      if (!traceId && assistToken && assistToken !== 'unknown') {
+        traceId = await this.resolveTraceId(projectId, assistToken, 1);
+      }
       return {
         query: row.query,
         golden: row.golden || '',
@@ -283,7 +295,8 @@ export class EvalService {
         engineId,
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
-        traceUrl: finalTraceUrl
+        traceId,
+        traceUrl: this.getTraceUrl(traceId, projectId),
       };
     }
   }
@@ -324,27 +337,42 @@ export class EvalService {
     }
   }
 
-  private getTraceUrl(
-      assistToken: string|undefined,
+  private async resolveTraceId(
       projectId: string,
-      ): string|undefined {
-    if (assistToken && assistToken !== 'unknown' && projectId.trim()) {
-      const queryJson = JSON.stringify({
-        plotType: 'HEATMAP',
-        timeSeriesQuery: {
-          traceQuery: {
-            spanDataValue: 'SPAN_DURATION',
-            spanFilters: {
-              attributes: [{
-                key: 'gemini_enterprise.assist_token',
-                value: [assistToken],
-              }],
-            },
-          },
-        },
-      });
-      return `https://console.cloud.google.com/traces/explorer;query=${
-          encodeURIComponent(queryJson)};duration=P30D?project=${projectId.trim()}`;
+      assistToken: string,
+      maxAttempts = this.traceRetryMaxAttempts,
+  ): Promise<string|undefined> {
+    if (!projectId.trim() || !assistToken || assistToken === 'unknown') {
+      return undefined;
+    }
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const traceId =
+            await this.evalBackendService.fetchTraceId(projectId, assistToken);
+        if (traceId) {
+          return traceId;
+        }
+      } catch (error) {
+        console.warn('Error fetching trace ID:', error);
+        return undefined;
+      }
+      if (attempt < maxAttempts - 1 && this.traceRetryDelayMs > 0) {
+        await new Promise(
+            resolve => setTimeout(resolve, this.traceRetryDelayMs));
+      }
+    }
+    return undefined;
+  }
+
+  private getTraceUrl(
+      traceId: string|undefined,
+      projectId: string,
+  ): string|undefined {
+    const trimmedProjectId = projectId.trim();
+    if (traceId && trimmedProjectId) {
+      return `https://console.cloud.google.com/traces/explorer;traceId=${
+          encodeURIComponent(traceId)};duration=P30D?project=${
+          encodeURIComponent(trimmedProjectId)}`;
     }
     return undefined;
   }

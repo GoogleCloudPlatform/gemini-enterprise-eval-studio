@@ -35,6 +35,7 @@ describe('EvalService', () => {
       ]
     });
     service = TestBed.inject(EvalService);
+    service.traceRetryDelayMs = 0;
   });
 
   describe('scoreResponse parsing', () => {
@@ -519,17 +520,24 @@ describe('EvalService', () => {
       expect(result.fetched).toContain('[1] Doc 2 - https://example.com/2');
     });
 
-    it('should generate traceUrl with query when assistToken is present',
+    it('should construct traceUrl when assistToken is returned and fetchTraceId succeeds',
        async () => {
-         mockBackendService.callAssistSpy.and.returnValue(
-             Promise.resolve(new Response(JSON.stringify([{
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([{
                assistToken: 'my-assist-token-123',
                answer: {
-                 replies: [
-                   {groundedContent: {content: {text: 'Response from assist'}}}
-                 ]
+                 replies: [{
+                   groundedContent:
+                       {content: {text: 'Response from assist'}}
+                 }]
                }
-             }]))));
+             }])));
+         mockBackendService.callScoreSpy.and.resolveTo(
+             new Response(JSON.stringify({
+               candidates: [{content: {parts: [{text: '0.9'}]}}],
+             })));
+         mockBackendService.fetchTraceIdSpy.and.resolveTo(
+             '0123456789abcdef0123456789abcdef');
 
          spyOn(service['stateService'], 'getCurrentConfig')
              .and.returnValue(config);
@@ -537,39 +545,175 @@ describe('EvalService', () => {
          const result =
              await service.processRow({query: 'my query', golden: 'my golden'});
 
-         const expectedQueryJson = JSON.stringify({
-           plotType: 'HEATMAP',
-           timeSeriesQuery: {
-             traceQuery: {
-               spanDataValue: 'SPAN_DURATION',
-               spanFilters: {
-                 attributes: [{
-                   key: 'gemini_enterprise.assist_token',
-                   value: ['my-assist-token-123'],
-                 }],
-               },
-             },
-           },
-         });
+         expect(mockBackendService.fetchTraceIdSpy)
+             .toHaveBeenCalledWith('project', 'my-assist-token-123');
+         expect(result.traceId).toBe('0123456789abcdef0123456789abcdef');
          expect(result.traceUrl)
              .toBe(
-                 `https://console.cloud.google.com/traces/explorer;query=${encodeURIComponent(expectedQueryJson)};duration=P30D?project=project`);
+                 'https://console.cloud.google.com/traces/explorer;traceId=0123456789abcdef0123456789abcdef;duration=P30D?project=project');
+       });
+
+    it('should retry fetchTraceId and construct traceUrl when traceId is resolved on a subsequent attempt',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([{
+               assistToken: 'my-assist-token-123',
+               answer: {
+                 replies: [
+                   {groundedContent: {content: {text: 'Response from assist'}}}
+                 ]
+               }
+             }])));
+         mockBackendService.callScoreSpy.and.resolveTo(
+             new Response(JSON.stringify({
+               candidates: [{content: {parts: [{text: '0.9'}]}}],
+             })));
+         let calls = 0;
+         mockBackendService.fetchTraceIdSpy.and.callFake(async () => {
+           calls++;
+           return calls === 3 ? '0123456789abcdef0123456789abcdef' : undefined;
+         });
+
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result =
+             await service.processRow({query: 'my query', golden: 'my golden'});
+
+         expect(calls).toBe(3);
+         expect(result.traceId).toBe('0123456789abcdef0123456789abcdef');
+         expect(result.traceUrl)
+             .toBe(
+                 'https://console.cloud.google.com/traces/explorer;traceId=0123456789abcdef0123456789abcdef;duration=P30D?project=project');
+       });
+
+    it('should URL-encode traceId and trimmed projectId in traceUrl',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([{
+               assistToken: 'my-assist-token-123',
+               answer: {
+                 replies: [
+                   {groundedContent: {content: {text: 'Response from assist'}}}
+                 ]
+               }
+             }])));
+         mockBackendService.callScoreSpy.and.resolveTo(
+             new Response(JSON.stringify({
+               candidates: [{content: {parts: [{text: '0.9'}]}}],
+             })));
+         mockBackendService.fetchTraceIdSpy.and.resolveTo(
+             'trace/id?with=special&chars');
+
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue({...config, projectId: '  my-org:my-project  '});
+
+         const result =
+             await service.processRow({query: 'my query', golden: 'my golden'});
+
+         expect(result.traceUrl)
+             .toBe(
+                 'https://console.cloud.google.com/traces/explorer;traceId=trace%2Fid%3Fwith%3Dspecial%26chars;duration=P30D?project=my-org%3Amy-project');
+       });
+
+    it('should return undefined traceUrl when fetchTraceId returns undefined after retries',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([{
+               assistToken: 'my-assist-token-123',
+               answer: {
+                 replies: [
+                   {groundedContent: {content: {text: 'Response from assist'}}}
+                 ]
+               }
+             }])));
+         mockBackendService.callScoreSpy.and.resolveTo(
+             new Response(JSON.stringify({
+               candidates: [{content: {parts: [{text: '0.9'}]}}],
+             })));
+         mockBackendService.fetchTraceIdSpy.and.resolveTo(undefined);
+
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result =
+             await service.processRow({query: 'my query', golden: 'my golden'});
+
+         expect(mockBackendService.fetchTraceIdSpy)
+             .toHaveBeenCalledTimes(service.traceRetryMaxAttempts);
+         expect(result.traceId).toBeUndefined();
+         expect(result.traceUrl).toBeUndefined();
+       });
+
+    it('should fail fast without retrying and preserve fetched text and score when fetchTraceId rejects',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([{
+               assistToken: 'my-assist-token-123',
+               answer: {
+                 replies: [
+                   {groundedContent: {content: {text: 'Response from assist'}}}
+                 ]
+               }
+             }])));
+         mockBackendService.callScoreSpy.and.resolveTo(
+             new Response(JSON.stringify({
+               candidates: [{content: {parts: [{text: '0.95'}]}}],
+             })));
+         mockBackendService.fetchTraceIdSpy.and.rejectWith(
+             new Error('Failed to fetch trace ID: HTTP 403'));
+
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result =
+             await service.processRow({query: 'my query', golden: 'my golden'});
+
+         expect(result.fetched).toBe('Response from assist');
+         expect(result.score).toBe(0.95);
+         expect(mockBackendService.fetchTraceIdSpy).toHaveBeenCalledTimes(1);
+         expect(result.traceId).toBeUndefined();
+         expect(result.traceUrl).toBeUndefined();
+       });
+
+    it('should attempt fetchTraceId at most once without polling when callAssist fails with 429',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(
+                 JSON.stringify({
+                   details: [{
+                     assistToken: 'rate-limited-token',
+                     reason: 'Quota exceeded',
+                   }],
+                 }),
+                 {status: 429}));
+         mockBackendService.fetchTraceIdSpy.and.resolveTo(undefined);
+
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result =
+             await service.processRow({query: 'my query', golden: 'my golden'});
+
+         expect(result.fetched).toContain('Rate limited: Quota exceeded');
+         expect(mockBackendService.fetchTraceIdSpy).toHaveBeenCalledTimes(1);
        });
 
     it('should handle gracefully when assist token is missing', async () => {
-      mockBackendService.callAssistSpy.and.returnValue(
-          Promise.resolve(new Response(JSON.stringify([{
+      mockBackendService.callAssistSpy.and.resolveTo(
+          new Response(JSON.stringify([{
             answer: {
               replies:
-                  [{groundedContent: {content: {text: 'Response from assist'}}}]
-            }
-          }]))));
+                  [{groundedContent: {content: {text: 'Response from assist'}}}],
+            },
+          }])));
 
       spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
 
       const result =
           await service.processRow({query: 'my query', golden: 'my golden'});
 
+      expect(result.traceId).toBeUndefined();
       expect(result.traceUrl).toBeUndefined();
     });
 

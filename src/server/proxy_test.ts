@@ -15,6 +15,7 @@
  */
 
 import {Request, Response} from 'express';
+import {google} from 'googleapis';
 
 import {Config} from './config';
 import {createProxyRouter} from './proxy';
@@ -147,6 +148,161 @@ describe('proxy module', () => {
          expect(mockFetch).toHaveBeenCalled();
          expect(statusSpy).toHaveBeenCalledWith(403);
          expect(sendSpy).toHaveBeenCalledWith('Forbidden');
+       });
+  });
+
+  describe('/api/v1/trace', () => {
+    it('should return 400 when projectId or assistToken is missing or not a string',
+       async () => {
+         const router = createProxyRouter(mockConfig);
+         const route =
+             router.stack.find(s => s.route?.path === '/api/v1/trace');
+         expect(route).toBeDefined();
+
+         const sendSpy = jasmine.createSpy('send');
+         const statusSpy =
+             jasmine.createSpy('status').and.returnValue({send: sendSpy});
+         const res = {
+           status: statusSpy,
+           json: jasmine.createSpy('json'),
+         } as unknown as Response;
+
+         await route!.route!.stack[0].handle(
+             {query: {projectId: 'p1'}} as unknown as Request, res, () => {});
+         expect(statusSpy).toHaveBeenCalledWith(400);
+
+         statusSpy.calls.reset();
+         await route!.route!.stack[0].handle(
+             {query: {projectId: ['p1', 'p2'], assistToken: 'token-xyz'}} as
+                 unknown as Request,
+             res, () => {});
+         expect(statusSpy).toHaveBeenCalledWith(400);
+       });
+
+    it('should call Cloud Trace API and return the first matching traceId',
+       async () => {
+         const router = createProxyRouter(mockConfig);
+         const route =
+             router.stack.find(s => s.route?.path === '/api/v1/trace');
+         expect(route).toBeDefined();
+
+         const requestSpy = jasmine.createSpy('request').and.resolveTo(
+             {data: {traces: [{traceId: 'trace-abc-123'}]}});
+         spyOn(google.auth, 'OAuth2').and.returnValue({
+           setCredentials: jasmine.createSpy('setCredentials'),
+           request: requestSpy,
+         } as unknown as InstanceType<typeof google.auth.OAuth2>);
+
+         const req = {
+           query: {
+             projectId: 'my-project',
+             assistToken: 'token-xyz',
+           },
+           session: {
+             token: {
+               access_token: 'mock-access-token',
+             },
+           },
+         } as unknown as Request;
+
+         const jsonSpy = jasmine.createSpy('json');
+         const res = {
+           status: jasmine.createSpy('status'),
+           json: jsonSpy,
+         } as unknown as Response;
+
+         await route!.route!.stack[0].handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledWith({
+           url:
+               'https://cloudtrace.googleapis.com/v1/projects/my-project/traces?filter=%2Bgemini_enterprise.assist_token%3Atoken-xyz&pageSize=1',
+           headers: {
+             'x-goog-user-project': 'my-project',
+           },
+         });
+         expect(jsonSpy).toHaveBeenCalledWith({traceId: 'trace-abc-123'});
+       });
+
+    it('should return undefined traceId when Cloud Trace API returns empty data',
+       async () => {
+         const router = createProxyRouter(mockConfig);
+         const route =
+             router.stack.find(s => s.route?.path === '/api/v1/trace');
+         expect(route).toBeDefined();
+
+         const requestSpy =
+             jasmine.createSpy('request').and.resolveTo({data: {}});
+         spyOn(google.auth, 'OAuth2').and.returnValue({
+           setCredentials: jasmine.createSpy('setCredentials'),
+           request: requestSpy,
+         } as unknown as InstanceType<typeof google.auth.OAuth2>);
+
+         const req = {
+           query: {
+             projectId: 'my-project',
+             assistToken: 'token-xyz',
+           },
+           session: {
+             token: {
+               access_token: 'mock-access-token',
+             },
+           },
+         } as unknown as Request;
+
+         const jsonSpy = jasmine.createSpy('json');
+         const res = {
+           status: jasmine.createSpy('status'),
+           json: jsonSpy,
+         } as unknown as Response;
+
+         await route!.route!.stack[0].handle(req, res, () => {});
+
+         expect(jsonSpy).toHaveBeenCalledWith({traceId: undefined});
+       });
+
+    it('should forward upstream error status and message on failure',
+       async () => {
+         const router = createProxyRouter(mockConfig);
+         const route =
+             router.stack.find(s => s.route?.path === '/api/v1/trace');
+         expect(route).toBeDefined();
+
+         const upstreamError =
+             Object.assign(new Error('Permission denied'), {
+               response: {status: 403},
+             });
+         const requestSpy =
+             jasmine.createSpy('request').and.rejectWith(upstreamError);
+         spyOn(google.auth, 'OAuth2').and.returnValue({
+           setCredentials: jasmine.createSpy('setCredentials'),
+           request: requestSpy,
+         } as unknown as InstanceType<typeof google.auth.OAuth2>);
+
+         const req = {
+           query: {
+             projectId: 'my-project',
+             assistToken: 'token-xyz',
+           },
+           session: {
+             token: {
+               access_token: 'mock-access-token',
+             },
+           },
+         } as unknown as Request;
+
+         const sendSpy = jasmine.createSpy('send');
+         const statusSpy =
+             jasmine.createSpy('status').and.returnValue({send: sendSpy});
+         const res = {
+           status: statusSpy,
+           json: jasmine.createSpy('json'),
+         } as unknown as Response;
+
+         await route!.route!.stack[0].handle(req, res, () => {});
+
+         expect(statusSpy).toHaveBeenCalledWith(403);
+         expect(sendSpy).toHaveBeenCalledWith(
+             'Proxy request failed: Permission denied');
        });
   });
 });

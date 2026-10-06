@@ -80,5 +80,17 @@ export class ProxyEvalBackendService extends EvalBackendService {
       return null;
     }
   }
+
+  override async fetchTraceId(projectId: string, assistToken: string):
+      Promise<string|undefined> {
+    if (!projectId || !assistToken) {
+      return undefined;
+    }
+    const url =
+        `/api/v1/trace?projectId=${encodeURIComponent(projectId)}&assistToken=${
+            encodeURIComponent(assistToken)}`;
+    const res = await firstValueFrom(this.http.get<{traceId?: string}>(url));
+    return res?.traceId;
+  }
 }
 

@@ -49,5 +49,9 @@ export abstract class EvalBackendService {
       engineId: string,
       config: AppConfig
   ): Promise<WidgetConfigResponse | null>;
+  abstract fetchTraceId(
+      projectId: string,
+      assistToken: string
+  ): Promise<string | undefined>;
 }
 

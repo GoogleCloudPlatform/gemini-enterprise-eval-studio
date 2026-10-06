@@ -216,6 +216,53 @@ export function createProxyRouter(config: Config, refreshTokenStore?: RefreshTok
     }
   });
 
+  // 5. GET /api/v1/trace (Cloud Trace API lookup by assistToken)
+  router.get('/api/v1/trace', async (req: Request, res: Response) => {
+    const projectId = req.query['projectId'];
+    const assistToken = req.query['assistToken'];
+
+    if (
+      typeof projectId !== 'string' ||
+      typeof assistToken !== 'string' ||
+      !projectId ||
+      !assistToken
+    ) {
+      res.status(400).send('Missing projectId or assistToken parameter.');
+      return;
+    }
+
+    try {
+      const auth = new google.auth.OAuth2();
+      auth.setCredentials({ access_token: req.session?.token?.access_token || '' });
+
+      const filter = encodeURIComponent(`+gemini_enterprise.assist_token:${assistToken}`);
+      const url = `https://cloudtrace.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/traces?filter=${filter}&pageSize=1`;
+
+      const response = await auth.request<{traces?: Array<{traceId?: string}>}>({
+        url,
+        headers: {
+          'x-goog-user-project': projectId,
+        },
+      });
+
+      const traceId = response.data?.traces?.[0]?.traceId;
+      res.json({traceId});
+    } catch (err) {
+      const status =
+        typeof err === 'object' &&
+        err !== null &&
+        'response' in err &&
+        typeof err.response === 'object' &&
+        err.response !== null &&
+        'status' in err.response &&
+        typeof err.response.status === 'number'
+          ? err.response.status
+          : 500;
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(status).send(`Proxy request failed: ${message}`);
+    }
+  });
+
   return router;
 }
 

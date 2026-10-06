@@ -45,6 +45,7 @@ export class MockEvalBackendService extends EvalBackendService {
   callScoreSpy = jasmine.createSpy('callScore').and.returnValue(Promise.resolve(new Response('{}')));
   fetchEnginesSpy = jasmine.createSpy('fetchEngines').and.returnValue(Promise.resolve([]));
   fetchWidgetConfigSpy = jasmine.createSpy('fetchWidgetConfig').and.returnValue(Promise.resolve(null));
+  fetchTraceIdSpy = jasmine.createSpy('fetchTraceId').and.resolveTo(undefined);
 
 
   override callAssist(request: AssistRequest): Promise<Response> {
@@ -63,5 +64,7 @@ export class MockEvalBackendService extends EvalBackendService {
     return this.fetchWidgetConfigSpy(projectId, region, engineId, config);
   }
 
-
+  override fetchTraceId(projectId: string, assistToken: string): Promise<string | undefined> {
+    return this.fetchTraceIdSpy(projectId, assistToken);
+  }
 }

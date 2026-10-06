@@ -121,6 +121,35 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
     return await response.json() as WidgetConfigResponse;
   }
 
+  override async fetchTraceId(
+      projectId: string,
+      assistToken: string
+  ): Promise<string | undefined> {
+    if (!projectId || !assistToken) {
+      return undefined;
+    }
+    const token = this.getGCloudToken();
+    const filter = encodeURIComponent(
+        `+gemini_enterprise.assist_token:${assistToken}`);
+    const url = `https://cloudtrace.googleapis.com/v1/projects/${
+        encodeURIComponent(projectId)}/traces?filter=${filter}`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'x-goog-user-project': projectId,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!response.ok) {
+      const error =
+          new Error(`Failed to fetch trace ID: HTTP ${response.status}`);
+      (error as {status?: number}).status = response.status;
+      throw error;
+    }
+    const data = await response.json();
+    return data.traces?.[0]?.traceId;
+  }
+
   private getGCloudToken(): string {
     return this.stateService.getCurrentConfig().gCloudToken || '';
   }

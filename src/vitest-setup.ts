@@ -188,6 +188,14 @@ function wrapSpy(mock: any) {
       mock.mockReturnValue(val);
       return spy;
     },
+    resolveTo: (val: unknown) => {
+      mock.mockResolvedValue(val);
+      return spy;
+    },
+    rejectWith: (val: unknown) => {
+      mock.mockRejectedValue(val);
+      return spy;
+    },
     callFake: (fn: any) => {
       mock.mockImplementation(fn);
       return spy;
