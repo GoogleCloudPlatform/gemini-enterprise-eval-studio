@@ -18,9 +18,26 @@ import {CommonModule} from '@angular/common';
 import {ChangeDetectorRef, Component} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 
-import {ComparisonResult} from '../../models/comparison-result.model';
+import {ComparisonResult, ScoreComparison} from '../../models/comparison-result.model';
+import {ScoreColumn, findScoreColumns, scoreColumnHeader} from '../../scoring/score-columns';
 import {CsvService} from '../../services/csv.service';
 import {CsvTableComponent, ColumnDef} from '../shared/csv-table/csv-table.component';
+
+/** Columns, besides the score columns, that every uploaded CSV must have. */
+const REQUIRED_COLUMNS = ['query', 'fetched'];
+
+/** The Query column leading the comparison table. */
+const QUERY_COLUMN: ColumnDef = {header: 'Query', key: 'query', truncate: true};
+
+/**
+ * A scorer present in both uploaded CSVs, with the normalized column keys its
+ * scores sit under in each.
+ */
+interface SharedScorer {
+  scorer: string;
+  baselineKey: string;
+  recentKey: string;
+}
 
 @Component({
   selector: 'app-compare-evals',
@@ -34,20 +51,26 @@ import {CsvTableComponent, ColumnDef} from '../shared/csv-table/csv-table.compon
 export class CompareEvalsComponent {
   baselineFile: File|null = null;
   baselineRows: Array<Record<string, string>> = [];
+  baselineScoreColumns: ScoreColumn[] = [];
   recentFile: File|null = null;
   recentRows: Array<Record<string, string>> = [];
+  recentScoreColumns: ScoreColumn[] = [];
   comparisonResults: ComparisonResult[] = [];
   isDraggingBaseline = false;
   isDraggingRecent = false;
   baselineError: string|null = null;
   recentError: string|null = null;
+  /** Why the last comparison produced no results, if it failed. */
+  compareError: string|null = null;
 
-  columns: ColumnDef[] = [
-    {header: 'Query', key: 'query', truncate: true},
-    {header: 'Baseline Score', key: 'baselineScore', type: 'number'},
-    {header: 'Recent Score', key: 'recentScore', type: 'number'},
-    {header: 'Delta', key: 'delta', type: 'delta'}
-  ];
+  /** The comparison table's columns: three per scorer shared by both CSVs. */
+  columns: ColumnDef[] = [QUERY_COLUMN];
+
+  /**
+   * `comparisonResults` flattened for the table and the CSV export: one
+   * baseline, recent and delta column per scorer.
+   */
+  displayResults: Array<Record<string, unknown>> = [];
 
   constructor(private csvService: CsvService, private cdr: ChangeDetectorRef) {}
 
@@ -136,26 +159,31 @@ export class CompareEvalsComponent {
     }
 
     this.csvService.parseCSV(file, (data) => {
+      const headers =
+          data.length > 0 ? Object.keys(data[0]).map(cleanHeader) : [];
+      // Score columns are found before the headers are lowercased, so the
+      // comparison can show the scorer names as they were exported.
+      const scoreColumns = findScoreColumns(headers);
       const normalizedData = this.normalizeRows(data);
 
       if (normalizedData.length > 0) {
-        const headers = Object.keys(normalizedData[0]);
-        const requiredColumns = ['query', 'score', 'fetched'];
-        const missingColumns =
-            requiredColumns.filter(col => !headers.includes(col));
+        const normalizedHeaders = headers.map(header => header.toLowerCase());
+        const missingColumns = REQUIRED_COLUMNS.filter(
+            col => !normalizedHeaders.includes(col));
+        if (scoreColumns.length === 0) {
+          missingColumns.push(scoreColumnHeader('<scoring method>'));
+        }
 
         if (missingColumns.length > 0) {
+          const error = `CSV must contain columns: query, fetched and at ` +
+              `least one "${scoreColumnHeader('<scoring method>')}" ` +
+              `column. Missing columns - ${missingColumns.join(', ')}`;
           if (type === 'baseline') {
             this.baselineFile = null;
-            this.baselineError =
-                `CSV must contain columns: query, score, fetched. Missing columns - ${
-                    missingColumns.join(', ')}`;
-
+            this.baselineError = error;
           } else {
             this.recentFile = null;
-            this.recentError =
-                `CSV must contain columns: query, score, fetched. Missing columns - ${
-                    missingColumns.join(', ')}`;
+            this.recentError = error;
           }
           this.cdr.detectChanges();
           return;
@@ -164,8 +192,10 @@ export class CompareEvalsComponent {
 
       if (type === 'baseline') {
         this.baselineRows = normalizedData;
+        this.baselineScoreColumns = scoreColumns;
       } else {
         this.recentRows = normalizedData;
+        this.recentScoreColumns = scoreColumns;
       }
       this.cdr.detectChanges();
     }, (err) => console.error(err));
@@ -180,38 +210,137 @@ export class CompareEvalsComponent {
     return rows.map((row) => {
       const normalizedRow: Record<string, string> = {};
       for (const [key, value] of Object.entries(row)) {
-        const normalizedKey = key.trim().replace(/^\ufeff/, '').toLowerCase();
-        normalizedRow[normalizedKey] = value;
+        normalizedRow[cleanHeader(key).toLowerCase()] = value;
       }
       return normalizedRow;
+    });
+  }
+
+  /**
+   * The scorers present in both uploaded CSVs, matched by name regardless of
+   * case, in baseline order.
+   */
+  private sharedScorers(): SharedScorer[] {
+    const recentByScorer = new Map(this.recentScoreColumns.map(
+        column => [column.scorer.toLowerCase(), column]));
+    return this.baselineScoreColumns.flatMap(baseline => {
+      const recent = recentByScorer.get(baseline.scorer.toLowerCase());
+      if (!recent) {
+        return [];
+      }
+      return [{
+        scorer: baseline.scorer,
+        baselineKey: baseline.header.toLowerCase(),
+        recentKey: recent.header.toLowerCase(),
+      }];
     });
   }
 
   /** Compares baseline and recent evaluations. */
   compareEvals() {
     this.comparisonResults = [];
+    this.displayResults = [];
+    this.compareError = null;
+
+    const scorers = this.sharedScorers();
+    this.columns = [
+      QUERY_COLUMN,
+      ...scorers.flatMap((shared, i) => [
+        {
+          header: `${shared.scorer} Baseline`,
+          key: baselineScoreKey(i),
+          type: 'number' as const
+        },
+        {
+          header: `${shared.scorer} Recent`,
+          key: recentScoreKey(i),
+          type: 'number' as const
+        },
+        {
+          header: `${shared.scorer} Delta`,
+          key: deltaKey(i),
+          type: 'delta' as const
+        },
+      ]),
+    ];
+    if (scorers.length === 0) {
+      this.compareError =
+          'The two CSVs share no scoring method, so there is nothing to ' +
+          'compare. Re-run one of them with a common scoring method.';
+      this.cdr.detectChanges();
+      return;
+    }
+
     const recentMap = new Map(this.recentRows.map(r => [r['query'], r]));
 
     this.baselineRows.forEach(baseRow => {
       const recentRow = recentMap.get(baseRow['query']);
       if (recentRow) {
-        const baselineScore = Number(baseRow['score'] || baseRow['autoraterscore'] || baseRow['bertscore']) || 0;
-        const recentScore = Number(recentRow['score'] || recentRow['autoraterscore'] || recentRow['bertscore']) || 0;
-        const delta = Number((recentScore - baselineScore).toFixed(2));
-        
+        const scores = scorers.map((shared): ScoreComparison => {
+          const baselineScore = parseScore(baseRow[shared.baselineKey]);
+          const recentScore = parseScore(recentRow[shared.recentKey]);
+          const delta = baselineScore === null || recentScore === null ?
+              null :
+              Number((recentScore - baselineScore).toFixed(2));
+          return {scorer: shared.scorer, baselineScore, recentScore, delta};
+        });
+
         const baselineResponse = baseRow['fetched'] || baseRow['fetchedresponse'] || 'N/A';
         const recentResponse = recentRow['fetched'] || recentRow['fetchedresponse'] || 'N/A';
 
         this.comparisonResults.push({
           query: baseRow['query'],
-          baselineScore,
-          recentScore,
-          delta,
+          scores,
           baselineResponse,
           recentResponse
         });
       }
     });
+
+    this.displayResults = this.comparisonResults.map(result => {
+      const flat: Record<string, unknown> = {query: result.query};
+      result.scores.forEach((score, i) => {
+        flat[baselineScoreKey(i)] = score.baselineScore ?? '';
+        flat[recentScoreKey(i)] = score.recentScore ?? '';
+        flat[deltaKey(i)] = score.delta ?? '';
+      });
+      return flat;
+    });
     this.cdr.detectChanges();
   }
+}
+
+/** Strips the whitespace and byte order mark a CSV header may carry. */
+function cleanHeader(header: string): string {
+  return header.trim().replace(/^\ufeff/, '');
+}
+
+/**
+ * Reads a score cell.
+ * @param value The raw cell value.
+ * @returns The score, or null when the cell is empty or not a number, such as
+ *     for a row the scorer skipped.
+ */
+function parseScore(value: string|undefined): number|null {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const score = Number(trimmed);
+  return isNaN(score) ? null : score;
+}
+
+/** Column key of the i-th shared scorer's baseline score. */
+function baselineScoreKey(i: number): string {
+  return `baseline_${i}`;
+}
+
+/** Column key of the i-th shared scorer's recent score. */
+function recentScoreKey(i: number): string {
+  return `recent_${i}`;
+}
+
+/** Column key of the i-th shared scorer's score delta. */
+function deltaKey(i: number): string {
+  return `delta_${i}`;
 }

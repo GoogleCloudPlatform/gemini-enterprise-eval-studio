@@ -15,13 +15,26 @@
  */
 
 /**
+ * How one scorer's score moved between the two evaluations of a query.
+ */
+export interface ScoreComparison {
+  /** Display name of the scorer. */
+  scorer: string;
+  /** The baseline score, or null when the baseline has none for the query. */
+  baselineScore: number|null;
+  /** The recent score, or null when the recent run has none for the query. */
+  recentScore: number|null;
+  /** Recent minus baseline, or null when either score is missing. */
+  delta: number|null;
+}
+
+/**
  * Represents the result of comparing two evaluations.
  */
 export interface ComparisonResult {
   query: string;
-  baselineScore: number;
-  recentScore: number;
-  delta: number;
+  /** One entry per scorer present in both evaluations, in baseline order. */
+  scores: ScoreComparison[];
   baselineResponse?: string;
   recentResponse?: string;
 }

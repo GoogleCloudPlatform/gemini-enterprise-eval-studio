@@ -80,8 +80,12 @@
         </button>
     </div>
 
+    <div *ngIf="compareError" class="text-sm bg-red-50 text-red-600 p-3 rounded-md text-center" role="alert">
+        {{ compareError }}
+    </div>
+
     <!-- Comparison Results Table -->
-    <app-csv-table *ngIf="comparisonResults.length > 0" [data]="comparisonResults" [columns]="columns" [title]="'Comparison Results'" [exportFileName]="'compare_results'"></app-csv-table>
+    <app-csv-table *ngIf="comparisonResults.length > 0" [data]="displayResults" [columns]="columns" [title]="'Comparison Results'" [exportFileName]="'compare_results'"></app-csv-table>
 
     <!-- Side-by-side Comparison Dashboard -->
     <div *ngIf="comparisonResults.length > 0" class="mt-8 space-y-6">
@@ -103,11 +107,13 @@
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <!-- Baseline Column -->
               <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
-                <div class="flex justify-between items-center mb-3 pb-3 border-b border-gray-100">
+                <div class="flex justify-between items-start mb-3 pb-3 border-b border-gray-100">
                   <span class="text-sm font-medium text-gray-500">Baseline</span>
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs text-gray-400">Auto rater Score</span>
-                    <span class="font-mono font-medium text-gray-900">{{ result.baselineScore }}</span>
+                  <div class="flex flex-col items-end gap-1">
+                    <div *ngFor="let score of result.scores" class="flex items-center gap-2">
+                      <span class="text-xs text-gray-400">{{ score.scorer }}</span>
+                      <span class="font-mono font-medium text-gray-900">{{ score.baselineScore ?? 'N/A' }}</span>
+                    </div>
                   </div>
                 </div>
                 <div class="text-sm text-gray-700 max-h-40 overflow-y-auto custom-scrollbar pr-2 whitespace-pre-wrap font-sans">
@@ -117,20 +123,22 @@
 
               <!-- Recent Column -->
               <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative">
-                <div class="flex justify-between items-center mb-3 pb-3 border-b border-gray-100">
+                <div class="flex justify-between items-start mb-3 pb-3 border-b border-gray-100">
                   <span class="text-sm font-medium text-gray-500">Recent</span>
-                  <div class="flex items-center gap-3">
-                    <div class="flex items-center text-xs font-medium px-2 py-0.5 rounded-full"
-                         [ngClass]="{
-                           'bg-green-100 text-green-700': result.delta > 0.10,
-                           'bg-red-100 text-red-700': result.delta < -0.10,
-                           'bg-gray-100 text-gray-600': result.delta >= -0.10 && result.delta <= 0.10
-                         }">
-                      {{ result.delta > 0 ? '+' : '' }}{{ result.delta }}
-                    </div>
-                    <div class="flex items-center gap-2">
-                      <span class="text-xs text-gray-400">Auto rater Score</span>
-                      <span class="font-mono font-medium text-gray-900">{{ result.recentScore }}</span>
+                  <div class="flex flex-col items-end gap-1">
+                    <div *ngFor="let score of result.scores" class="flex items-center gap-3">
+                      <div *ngIf="score.delta !== null" class="flex items-center text-xs font-medium px-2 py-0.5 rounded-full"
+                           [ngClass]="{
+                             'bg-green-100 text-green-700': score.delta > 0.10,
+                             'bg-red-100 text-red-700': score.delta < -0.10,
+                             'bg-gray-100 text-gray-600': score.delta >= -0.10 && score.delta <= 0.10
+                           }">
+                        {{ score.delta > 0 ? '+' : '' }}{{ score.delta }}
+                      </div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs text-gray-400">{{ score.scorer }}</span>
+                        <span class="font-mono font-medium text-gray-900">{{ score.recentScore ?? 'N/A' }}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
