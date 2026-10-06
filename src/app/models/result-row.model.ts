@@ -30,17 +30,15 @@ export interface ResultRow {
   ttfa: number;
   /** Time to Last Token in seconds (s). */
   ttlt: number;
-  score: number;
   /**
-   * One entry per scorer that ran, in run order. `scorerResults[0]` is the
-   * primary scorer; read its id, score and error from there.
+   * One entry per scorer that ran, in run order, carrying each scorer's score
+   * and error. Empty when the response could not be fetched.
    */
-  scorerResults?: ScorerRunResult[];
+  scorerResults: ScorerRunResult[];
   assistToken?: string;
   projectId?: string;
   region?: string;
   engineId?: string;
-  scoreError?: string;
   traceId?: string;
   traceUrl?: string;
   /** Conversation grouping id, present only for multi-turn rows. */

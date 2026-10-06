@@ -16,9 +16,10 @@
 
 import {Injectable} from '@angular/core';
 
-import {AppConfig} from '../models/app-config.model';
 import {CSVRow} from '../models/csv-row.model';
 import {ResultRow} from '../models/result-row.model';
+import {ScorerRunResult, ScoringRequest} from '../scoring/scorer';
+import {ScorerRegistry} from '../scoring/scorer.registry';
 
 import {EvalBackendService} from './eval-backend.service';
 import {StateService} from './state.service';
@@ -61,7 +62,8 @@ export class EvalService {
 
   constructor(
       private readonly stateService: StateService,
-      private readonly evalBackendService: EvalBackendService
+      private readonly evalBackendService: EvalBackendService,
+      private readonly scorerRegistry: ScorerRegistry,
   ) {}
 
   /**
@@ -241,17 +243,13 @@ export class EvalService {
           this.resolveTraceId(projectId, assistToken) :
           Promise.resolve(traceId);
 
-      let score = 0;
-      let scoreError: string | undefined;
-      if (row.golden) {        onProgress?.('score');
-        try {
-          score = await this.scoreResponse(
-              row.query, streamState.fullText, row.golden, config);
-        } catch (error) {
-          console.error('Error scoring response during evaluation:', error);
-          scoreError = (error as Error).message;
-        }
-      }
+      onProgress?.('score');
+      const scorerResults = await this.scoreAll({
+        query: row.query,
+        response: streamState.fullText,
+        golden: row.golden,
+        config
+      });
 
       traceId = await traceIdPromise;
 
@@ -263,12 +261,11 @@ export class EvalService {
         ttft: Number((streamState.ttft / 1000).toFixed(2)),
         ttfa: Number((streamState.ttfa / 1000).toFixed(2)),
         ttlt: Number((ttlt / 1000).toFixed(2)),
-        score,
+        scorerResults,
         assistToken,
         projectId,
         region,
         engineId,
-        scoreError,
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
         traceId,
@@ -288,7 +285,7 @@ export class EvalService {
         ttft: 0,
         ttfa: 0,
         ttlt: 0,
-        score: 0,
+        scorerResults: [],
         assistToken,
         projectId,
         region,
@@ -378,95 +375,49 @@ export class EvalService {
   }
 
   /**
-   * Scores the response using Gemini API.
-   * @param query The original query.
-   * @param response The fetched response to score.
-   * @param golden The golden response to compare against.
-   * @param config The application configuration.
-   * @returns A promise that resolves to the score as a number.
+   * Runs every scorer named by the configuration against a single response.
+   *
+   * The scorers run one after another rather than concurrently, so a run
+   * spreads its load over time instead of firing every scorer's backend call
+   * at once. A scorer that throws does not stop the others: its failure is
+   * recorded on its own entry.
+   *
+   * @param request The query, response, golden answer and active config.
+   * @returns One entry per configured scorer, in run order. Never empty.
    */
-  async scoreResponse(
-      query: string, response: string, golden: string,
-      config: AppConfig): Promise<number> {
-    const prompt = `${config.autoRaterInstruction}
+  async scoreAll(request: ScoringRequest): Promise<ScorerRunResult[]> {
+    const scorers =
+        this.scorerRegistry.resolveAll(request.config.selectedScorers);
+    const results: ScorerRunResult[] = [];
 
-    Query: ${query}
-    Fetched Response: ${response}
-    Golden Response: ${golden}
+    for (const scorer of scorers) {
+      const entry: ScorerRunResult = {
+        scorerId: scorer.id,
+        displayName: scorer.displayName,
+        score: 0
+      };
 
-    Provide only the score as a float between 0.0 and 1.0.`;
+      if (scorer.requiresGolden && !request.golden) {
+        entry.skipped = true;
+        results.push(entry);
+        continue;
+      }
 
-    const body = {contents: [{role: 'user', parts: [{text: prompt}]}]};
-
-    const res = await this.evalBackendService.callScore({
-      projectId: config.projectId,
-      region: config.region,
-      model: config.autoRaterModel,
-      body    });
-
-    if (!res.ok) {
-      let errorMessage = '';
       try {
-        const errorData = await res.json();
-        errorMessage = errorData.error?.message || `HTTP error! status: ${res.status}`;
-      } catch (e) {
-        if (res.status === 403 || res.status === 401) {
-          errorMessage = 'Permission denied. Please check your Google Cloud access token.';
-        } else if (res.status === 404) {
-          errorMessage = `Model '${config.autoRaterModel}' not found or not available.`;
-        } else if (res.status === 429) {
-          errorMessage = 'Rate limit exceeded. Please try again later.';
-        } else if (res.status === 503) {
-          errorMessage = 'Service temporarily unavailable. Please try again later.';
-        } else {
-          errorMessage = `HTTP error! status: ${res.status}`;
-        }
+        const result = await scorer.score(request);
+        entry.score = result.score;
+      } catch (error) {
+        console.error(
+            `Error scoring response with '${scorer.id}' during evaluation:`,
+            error);
+        // A rejection is not necessarily an `Error`, so a thrown string or
+        // object still gets a readable message instead of `undefined`.
+        entry.error = error instanceof Error ? error.message : String(error);
       }
-      throw new Error(errorMessage);
+      results.push(entry);
     }
 
-    const data = await res.json();
-    let text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (text) {
-      // 1. Remove markdown code block markers
-      text = text.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '');
-
-      // 2. Remove typical prefix strings like "Score: "
-      text = text.replace(
-          /^(?:Score|score|Rating|rating|Similarity Score|similarity score|Similarity score)\s*:\s*/g,
-          '');
-
-      // 3. Strip range and scale descriptors to avoid matching scale. Removed
-      // strings like these because the scale is mentioned in the instruction.
-      // Sample strings - endpoints (0.0, 1.0) between 0.0 and 1.0 / between
-      // 0 and 1 0.0 to 1.0 / 0 to 1 / 0-1 [0.0, 1.0] / [0, 1] out of 1 / out
-      // of 1.0 / 1 / / 1.0
-      let cleanText = text.replace(
-          /between\s+0?(?:\.0)?\s+(?:and|to)\s+1?(?:\.0)?/gi, '');
-      cleanText =
-          cleanText.replace(/0?(?:\.0)?\s*(?:-|to)\s*1?(?:\.0)?/g, '');
-      cleanText =
-          cleanText.replace(/\[\s*0?(?:\.0)?\s*,\s*1?(?:\.0)?\s*\]/g, '');
-      cleanText = cleanText.replace(/out\s+of\s+1?(?:\.0)?/gi, '');
-      cleanText = cleanText.replace(/\/\s*1?(?:\.0)?/g, '');
-
-      cleanText = cleanText.trim();
-
-      // 4. Try direct parseFloat first
-      const score = Number(cleanText);
-      if (!isNaN(score)) {
-        return score;
-      }
-
-      // 5. Fallback: match all decimal numbers in the text and use the last
-      // one
-      const matches = cleanText.match(/[0-9]+(?:\.[0-9]+)?/g);
-      if (matches && matches.length > 0) {
-        const lastScore = Number(matches[matches.length - 1]);
-        return isNaN(lastScore) ? 0 : lastScore;
-      }
-    }
-    return 0;
+    return results;
   }
 
   /**

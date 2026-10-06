@@ -78,7 +78,7 @@
   <!-- Results Table -->
   <div [hidden]="step !== 3">
     <app-csv-table
-      [data]="results"
+      [data]="displayResults"
       [columns]="columns"
       [title]="'Evaluation Results'"
       [exportFileName]="'eval_results'"

@@ -20,6 +20,8 @@ import {BehaviorSubject, of} from 'rxjs';
 
 import {AppConfig} from '../../models/app-config.model';
 import {ResultRow} from '../../models/result-row.model';
+import {ScoreResult, Scorer, ScorerRunResult, ScoringRequest} from '../../scoring/scorer';
+import {SCORERS} from '../../scoring/scorer.registry';
 import {AuthService} from '../../services/auth.service';
 import {EvalBackendService} from '../../services/eval-backend.service';
 import {EvalService} from '../../services/eval.service';
@@ -27,6 +29,30 @@ import {StateService} from '../../services/state.service';
 import {MockAuthService, MockEvalBackendService} from '../../testing/mocks';
 
 import {RunEvaluationComponent} from './run-evaluation.component';
+
+/**
+ * A scorer whose identity and config keys are test controlled.
+ *
+ * Declared at module scope, as the other scorer tests do. Subclassing `Scorer`
+ * inside a `describe` body leaves the base class uninitialized in the external
+ * Vitest build, which fails with `Class extends value undefined`.
+ */
+class FakeScorer extends Scorer {
+  constructor(
+      readonly id: string, readonly displayName: string,
+      override readonly configKeys: ReadonlyArray<keyof AppConfig> = []) {
+    super();
+  }
+
+  async score(request: ScoringRequest): Promise<ScoreResult> {
+    return {score: 1};
+  }
+}
+
+/** The per-scorer results of a row scored by a single scorer. */
+function scored(score: number): ScorerRunResult[] {
+  return [{scorerId: 'first', displayName: 'First', score}];
+}
 
 describe('RunEvaluationComponent', () => {
   let mockStateService: jasmine.SpyObj<StateService>;
@@ -72,7 +98,8 @@ describe('RunEvaluationComponent', () => {
       resultsSubject.next(rows);
     });
 
-    mockEvalService = jasmine.createSpyObj('EvalService', ['processRow', 'scoreResponse']);
+    mockEvalService =
+        jasmine.createSpyObj('EvalService', ['processRow', 'scoreAll']);
     mockAuthService = new MockAuthService();
     mockEvalBackendService = new MockEvalBackendService();
 
@@ -113,7 +140,7 @@ describe('RunEvaluationComponent', () => {
         ttft: 10,
         ttfa: 20,
         ttlt: 30,
-        score: 0.9
+        scorerResults: []
       };
     });
 
@@ -149,7 +176,7 @@ describe('RunEvaluationComponent', () => {
         ttft: 10,
         ttfa: 20,
         ttlt: 30,
-        score: 0.9
+        scorerResults: []
       };
     });
 
@@ -177,7 +204,7 @@ describe('RunEvaluationComponent', () => {
            ttft: 10,
            ttfa: 20,
            ttlt: 30,
-           score: 0.9
+           scorerResults: []
          };
        });
 
@@ -217,7 +244,7 @@ describe('RunEvaluationComponent', () => {
            ttft: 10,
            ttfa: 20,
            ttlt: 30,
-           score: 0.9
+           scorerResults: []
          };
        });
 
@@ -234,7 +261,7 @@ describe('RunEvaluationComponent', () => {
          ttft: 10,
          ttfa: 20,
          ttlt: 30,
-         score: 0.9
+         scorerResults: []
        });
 
        tick();
@@ -268,7 +295,7 @@ describe('RunEvaluationComponent', () => {
         ttft: 10,
         ttfa: 20,
         ttlt: 30,
-        score: 0.9
+        scorerResults: []
       };
     });
 
@@ -282,7 +309,7 @@ describe('RunEvaluationComponent', () => {
       ttft: 10,
       ttfa: 20,
       ttlt: 30,
-      score: 0.9
+      scorerResults: []
     });
     tick();
 
@@ -307,7 +334,7 @@ describe('RunEvaluationComponent', () => {
         ttft: 10,
         ttfa: 20,
         ttlt: 30,
-        score: 0.9
+        scorerResults: scored(0.9)
       };
     });
 
@@ -342,7 +369,7 @@ describe('RunEvaluationComponent', () => {
                ttft: 10,
                ttfa: 20,
                ttlt: 30,
-               score: 0.9,
+               scorerResults: scored(0.9),
                session: `session-after-${row.query}`,
              };
            });
@@ -397,7 +424,7 @@ describe('RunEvaluationComponent', () => {
                ttft: 10,
                ttfa: 20,
                ttlt: 30,
-               score: 0.9,
+               scorerResults: scored(0.9),
                session: `session-after-${row.query}`,
              };
            });
@@ -435,7 +462,7 @@ describe('RunEvaluationComponent', () => {
            ttft: 10,
            ttfa: 20,
            ttlt: 30,
-           score: 0.9,
+           scorerResults: scored(0.9),
          };
        });
 
@@ -474,7 +501,7 @@ describe('RunEvaluationComponent', () => {
            ttft: 10,
            ttfa: 20,
            ttlt: 30,
-           score: 0.9,
+           scorerResults: scored(0.9),
          };
        });
 
@@ -509,7 +536,7 @@ describe('RunEvaluationComponent', () => {
            ttft: 10,
            ttfa: 20,
            ttlt: 30,
-           score: 0.9,
+           scorerResults: scored(0.9),
          };
        });
 
@@ -553,7 +580,7 @@ describe('RunEvaluationComponent', () => {
            ttft: 10,
            ttfa: 20,
            ttlt: 30,
-           score: 0.9,
+           scorerResults: scored(0.9),
          };
        });
 
@@ -615,7 +642,10 @@ describe('RunEvaluationComponent', () => {
            query: 'q1',
            golden: 'g1',
            fetched: 'f1',
-           score: 0.9,
+           ttft: 1,
+           ttfa: 2,
+           ttlt: 3,
+           scorerResults: scored(0.9),
            conversationId: 'conv-1',
            turn: 1,
          },
@@ -624,5 +654,334 @@ describe('RunEvaluationComponent', () => {
        expect(columnKeys).toContain('conversationId');
        expect(columnKeys).toContain('turn');
      });
+
+  it('should report the first scorer failure of a run', fakeAsync(() => {
+       const fixture = TestBed.createComponent(RunEvaluationComponent);
+       const component = fixture.componentInstance;
+       fixture.detectChanges();
+
+       mockEvalService.processRow.and.callFake(async row => ({
+                                                 query: row.query,
+                                                 golden: row.golden ?? '',
+                                                 fetched: 'f',
+                                                 ttft: 1,
+                                                 ttfa: 2,
+                                                 ttlt: 3,
+                                                 scorerResults: [{
+                                                   scorerId: 'first',
+                                                   displayName: 'First',
+                                                   score: 0,
+                                                   error: 'boom'
+                                                 }]
+                                               }));
+
+       component.startEvaluation(
+           {file: new File([], 'test.csv'), rows: [{query: 'q', golden: 'g'}]});
+       tick();
+
+       expect(component.errorMessage)
+           .toBe('Scoring failed for some rows: boom');
+     }));
+
+  describe('score columns', () => {
+    beforeEach(() => {
+      TestBed.overrideProvider(SCORERS, {
+        useValue: [
+          new FakeScorer('first', 'First'),
+          new FakeScorer('second', 'Second'),
+        ],
+      });
+    });
+
+    /** Selects the given scorers in the run configuration. */
+    function select(...ids: string[]) {
+      configSubject.next({...configSubject.value, selectedScorers: ids});
+    }
+
+    /** Builds a scored row carrying the given per-scorer outcomes. */
+    function rowWith(scorerResults: ScorerRunResult[]): ResultRow {
+      return {
+        query: 'q',
+        golden: 'g',
+        fetched: 'f',
+        ttft: 1,
+        ttfa: 2,
+        ttlt: 3,
+        scorerResults
+      };
+    }
+
+    it('should name the score column after the scorer', () => {
+      select('first');
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      resultsSubject.next(
+          [rowWith([{scorerId: 'first', displayName: 'First', score: 0.5}])]);
+
+      const headers = component.columns.map(c => c.header);
+      expect(headers).toContain('First Score');
+      expect(headers).not.toContain('Score');
+      expect(component.displayResults[0]['score_first']).toBe(0.5);
+      expect(component.displayResults[0]['scorerResults']).toBeUndefined();
+    });
+
+    it('should show every selected scorer\'s column before any row is scored',
+       () => {
+         select('first', 'second');
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         resultsSubject.next([]);
+
+         const headers = component.columns.map(c => c.header);
+         expect(headers).toContain('First Score');
+         expect(headers).toContain('Second Score');
+       });
+
+    it('should keep the columns unchanged as scored rows arrive', () => {
+      select('first', 'second');
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+      resultsSubject.next([]);
+      const columnsBeforeAnyRow = component.columns.map(c => c.key);
+
+      resultsSubject.next([rowWith([
+        {scorerId: 'first', displayName: 'First', score: 0.25},
+        {scorerId: 'second', displayName: 'Second', score: 0.75},
+      ])]);
+
+      expect(component.columns.map(c => c.key)).toEqual(columnsBeforeAnyRow);
+    });
+
+    it('should render one column per scorer when several ran', () => {
+      select('first', 'second');
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      resultsSubject.next([rowWith([
+        {scorerId: 'first', displayName: 'First', score: 0.25},
+        {scorerId: 'second', displayName: 'Second', score: 0.75},
+      ])]);
+
+      const headers = component.columns.map(c => c.header);
+      expect(headers).toContain('First Score');
+      expect(headers).toContain('Second Score');
+      expect(component.displayResults[0]['score_first']).toBe(0.25);
+      expect(component.displayResults[0]['score_second']).toBe(0.75);
+      // Nested results are flattened away so the CSV export stays tabular.
+      expect(component.displayResults[0]['scorerResults']).toBeUndefined();
+    });
+
+    it('should show the default scorer\'s column when none is selected', () => {
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      const headers = component.columns.map(c => c.header);
+      expect(headers).toContain('First Score');
+      expect(headers).not.toContain('Second Score');
+    });
+
+    it('should show per-scorer error columns before any row is scored', () => {
+      select('first', 'second');
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      resultsSubject.next([]);
+
+      const keys = component.columns.map(c => c.key);
+      expect(keys).toContain('scoreError_first');
+      expect(keys).toContain('scoreError_second');
+      expect(component.columns.map(c => c.header)).toContain('Second Error');
+    });
+
+    it('should fill the error columns from the scored rows', () => {
+      select('first', 'second');
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      resultsSubject.next([rowWith([
+        {scorerId: 'first', displayName: 'First', score: 0.25},
+        {scorerId: 'second', displayName: 'Second', score: 0, error: 'boom'},
+      ])]);
+
+      expect(component.displayResults[0]['scoreError_second']).toBe('boom');
+      expect(component.displayResults[0]['scoreError_first']).toBe('');
+    });
+
+    it('should not change the columns when rows bring errors or other scorers',
+       () => {
+         select('first');
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+         const columnsBeforeAnyRow = component.columns.map(c => c.key);
+
+         resultsSubject.next([rowWith([
+           {scorerId: 'first', displayName: 'First', score: 0, error: 'boom'},
+           {scorerId: 'second', displayName: 'Second', score: 0.75},
+         ])]);
+
+         expect(component.columns.map(c => c.key)).toEqual(columnsBeforeAnyRow);
+       });
+
+    it('should not rebuild the columns on unrelated configuration edits', () => {
+      select('first');
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+      resultsSubject.next([rowWith([
+        {scorerId: 'first', displayName: 'First', score: 0.25},
+        {scorerId: 'second', displayName: 'Second', score: 0.75},
+      ])]);
+      const columnsBefore = component.columns.map(c => c.key);
+
+      configSubject.next({...configSubject.value, projectId: 'other'});
+
+      expect(component.columns.map(c => c.key)).toEqual(columnsBefore);
+    });
+
+    it('should give every row the same score columns', () => {
+      select('first', 'second');
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      resultsSubject.next([
+        rowWith([
+          {scorerId: 'first', displayName: 'First', score: 0.25},
+          {scorerId: 'second', displayName: 'Second', score: 0.75},
+        ]),
+        // A row scored before 'second' was selected still needs both keys, or
+        // the CSV export would misalign its columns.
+        rowWith([{scorerId: 'first', displayName: 'First', score: 0.5}]),
+      ]);
+
+      expect(Object.keys(component.displayResults[0]))
+          .toEqual(Object.keys(component.displayResults[1]));
+      expect(component.displayResults[1]['score_second']).toBe('');
+    });
+  });
+
+  describe('startReRate', () => {
+    it('should re-score every row with all selected scorers', fakeAsync(() => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         resultsSubject.next([
+           {
+             query: 'q1',
+             golden: 'g1',
+             fetched: 'f1',
+             ttft: 1,
+             ttfa: 2,
+             ttlt: 3,
+             scorerResults: scored(0.1)
+           },
+           {
+             query: 'q2',
+             golden: 'g2',
+             fetched: 'f2',
+             ttft: 1,
+             ttfa: 2,
+             ttlt: 3,
+             scorerResults: scored(0.2)
+           },
+         ]);
+         mockEvalService.scoreAll.and.callFake(async () => [
+           {scorerId: 'first', displayName: 'First', score: 0.9},
+           {scorerId: 'second', displayName: 'Second', score: 0.8},
+         ]);
+
+         component.startReRate();
+         tick();
+
+         expect(mockEvalService.scoreAll).toHaveBeenCalledTimes(2);
+         const rescored = resultsSubject.value;
+         expect(rescored.map(row => row.scorerResults)).toEqual([
+           [
+             {scorerId: 'first', displayName: 'First', score: 0.9},
+             {scorerId: 'second', displayName: 'Second', score: 0.8},
+           ],
+           [
+             {scorerId: 'first', displayName: 'First', score: 0.9},
+             {scorerId: 'second', displayName: 'Second', score: 0.8},
+           ],
+         ]);
+         expect(component.errorMessage).toBeNull();
+       }));
+
+    it('should stop at the first failing row and keep the rest unchanged',
+       fakeAsync(() => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         resultsSubject.next([
+           {
+             query: 'q1',
+             golden: 'g1',
+             fetched: 'f1',
+             ttft: 1,
+             ttfa: 2,
+             ttlt: 3,
+             scorerResults: scored(0.1)
+           },
+           {
+             query: 'q2',
+             golden: 'g2',
+             fetched: 'f2',
+             ttft: 1,
+             ttfa: 2,
+             ttlt: 3,
+             scorerResults: scored(0.2)
+           },
+         ]);
+         mockEvalService.scoreAll.and.callFake(async () => [{
+           scorerId: 'first',
+           displayName: 'First',
+           score: 0,
+           error: 'quota exceeded'
+         }]);
+
+         component.startReRate();
+         tick();
+
+         expect(mockEvalService.scoreAll).toHaveBeenCalledTimes(1);
+         expect(component.errorMessage).toContain('quota exceeded');
+         expect(resultsSubject.value.map(row => row.scorerResults))
+             .toEqual([scored(0.1), scored(0.2)]);
+       }));
+
+    it('should skip scoring a row that was never fetched', fakeAsync(() => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         resultsSubject.next([{
+           query: 'q1',
+           golden: 'g1',
+           fetched: '',
+           ttft: 0,
+           ttfa: 0,
+           ttlt: 0,
+           scorerResults: []
+         }]);
+
+         component.startReRate();
+         tick();
+
+         expect(mockEvalService.scoreAll).not.toHaveBeenCalled();
+         expect(resultsSubject.value[0].scorerResults?.[0].skipped).toBeTrue();
+       }));
+  });
 });
 
