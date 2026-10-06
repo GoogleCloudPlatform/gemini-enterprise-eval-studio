@@ -1,0 +1,85 @@
+<div class="space-y-4">
+  <div *ngIf="showPicker">
+    <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+      ><span>Scoring Methods</span
+      ><app-info-tooltip
+        class="inline-flex"
+        text="The strategies used to score each fetched response. Every selected scorer runs against every row, one after another, and gets its own column in the results."
+      ></app-info-tooltip
+    ></label>
+    <div
+      class="border rounded-md divide-y divide-gray-200"
+      [class.border-red-500]="selectedScorers.length === 0"
+      [class.border-gray-300]="selectedScorers.length > 0"
+    >
+      <label
+        *ngFor="let s of scorers; index as i"
+        class="flex items-start gap-2 p-2 hover:bg-blue-50 transition-colors cursor-pointer select-none"
+      >
+        <input
+          type="checkbox"
+          [attr.aria-label]="s.displayName"
+          [attr.aria-describedby]="checkboxDescribedBy(s, i)"
+          [attr.aria-invalid]="selectedScorers.length === 0 ? 'true' : null"
+          [checked]="isScorerSelected(s)"
+          (change)="toggleScorer(s)"
+          class="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer"
+        />
+        <div>
+          <div class="text-sm text-gray-700">{{ s.displayName }}</div>
+          <div *ngIf="s.description" [id]="descriptionId(i)" class="text-xs text-gray-500">{{ s.description }}</div>
+        </div>
+      </label>
+    </div>
+    <div *ngIf="selectedScorers.length > 0" class="mt-1 text-xs text-gray-500">
+      {{ selectionSummary }}. Scorers run in the order listed above.
+    </div>
+  </div>
+  <div *ngIf="usesConfigKey('autoRaterModel')">
+    <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+      ><span>Auto Rater Model</span
+      ><app-info-tooltip
+        class="inline-flex"
+        text="The Gemini model to use for auto-rating."
+      ></app-info-tooltip
+    ></label>
+    <select
+      aria-label="Auto Rater Model"
+      [attr.aria-describedby]="inputDescribedBy('autoRaterModel')"
+      [(ngModel)]="config.autoRaterModel"
+      (ngModelChange)="onConfigChange()"
+      class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+      [disabled]="autoRaterModels.length === 0"
+    >
+      <option *ngFor="let m of autoRaterModels" [value]="m">{{ m }}</option>
+    </select>
+  </div>
+  <div *ngIf="usesConfigKey('autoRaterInstruction')">
+    <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+      ><span>Auto Rater Instruction</span
+      ><app-info-tooltip
+        class="inline-flex"
+        text="Instructions for the Gemini model acting as an auto-rater. Define the rubric or metric for scoring here. The model must output a score between 0.0 and 1.0."
+      ></app-info-tooltip
+    ></label>
+    <textarea
+      aria-label="Auto Rater Instruction"
+      [attr.aria-describedby]="inputDescribedBy('autoRaterInstruction')"
+      [(ngModel)]="config.autoRaterInstruction"
+      (ngModelChange)="onConfigChange()"
+      rows="6"
+      class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+      placeholder="Enter evaluation instructions..."
+    ></textarea>
+  </div>
+</div>
+<!--
+  Kept in the DOM, outside the spaced stack above, so screen readers announce
+  each new message; polite, so the user is not interrupted mid-edit.
+-->
+<div
+  [id]="errorId"
+  aria-live="polite"
+  class="text-xs text-red-600"
+  [class.mt-4]="!!validationError"
+>{{ validationError }}</div>

@@ -20,7 +20,7 @@ import {AppConfig} from '../../models/app-config.model';
 import {EvalBackendService} from '../../services/eval-backend.service';
 import {MockEvalBackendService} from '../../testing/mocks';
 
-import {AutoRaterScorer, MIN_AUTO_RATER_INSTRUCTION_LENGTH} from './auto-rater.scorer';
+import {AutoRaterScorer, MIN_AUTO_RATER_INSTRUCTION_LENGTH, listAutoRaterModels} from './auto-rater.scorer';
 
 const CONFIG: AppConfig = {
   gCloudToken: 'token',
@@ -247,5 +247,28 @@ describe('AutoRaterScorer', () => {
                  {...CONFIG, autoRaterModel: '', autoRaterInstruction: ''}))
           .toBe('Select an auto rater model.');
     });
+  });
+});
+
+describe('listAutoRaterModels', () => {
+  it('should offer the user credential models when the user supplies a token',
+     () => {
+       expect(listAutoRaterModels(true))
+           .toEqual(['gemini-3.1-pro-preview', 'gemini-3.5-flash']);
+     });
+
+  it('should offer the backend models when the backend holds the credentials',
+     () => {
+       expect(listAutoRaterModels(false))
+           .toEqual(['gemini-3.5-flash', 'gemini-3.1-pro']);
+     });
+
+  it('should return a copy the caller can change', () => {
+    listAutoRaterModels(true).push('edited');
+    listAutoRaterModels(false).length = 0;
+
+    expect(listAutoRaterModels(true)).not.toContain('edited');
+    expect(listAutoRaterModels(false))
+        .toEqual(['gemini-3.5-flash', 'gemini-3.1-pro']);
   });
 });

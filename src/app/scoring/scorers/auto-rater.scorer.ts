@@ -23,6 +23,25 @@ import {ScoreResult, Scorer, ScoringRequest} from '../scorer';
 /** Identifier of the LLM-as-a-judge scorer. */
 export const AUTO_RATER_SCORER_ID = 'auto-rater';
 
+/** Models offered when the user supplies their own access token. */
+const MODELS_WITH_USER_CREDENTIALS =
+    ['gemini-3.1-pro-preview', 'gemini-3.5-flash'];
+
+/** Models offered when the backend supplies the credentials. */
+const MODELS_WITH_BACKEND_CREDENTIALS = ['gemini-3.5-flash', 'gemini-3.1-pro'];
+
+/**
+ * The auto-rater models to offer, so every place that edits the scoring setup
+ * lists the same ones.
+ * @param showCredentialInputs Whether the user supplies their own credentials.
+ * @returns The models to list, preferred one first.
+ */
+export function listAutoRaterModels(showCredentialInputs: boolean): string[] {
+  // TODO b/514218151 - Fix hardcoded models.
+  return showCredentialInputs ? [...MODELS_WITH_USER_CREDENTIALS] :
+                                [...MODELS_WITH_BACKEND_CREDENTIALS];
+}
+
 /**
  * Shortest auto rater instruction accepted. Anything shorter is too brief to
  * describe a rubric and scoring scale.
