@@ -138,11 +138,16 @@ describe('ScorerRegistry', () => {
       expect(registry.resolveAll(['a', 'nope']).map(s => s.id)).toEqual(['a']);
     });
 
-    it('should fall back to the default scorer for an empty selection', () => {
+    it('should fall back to the default scorer for an unset selection', () => {
       const registry = registryOf('a', 'b');
 
-      expect(registry.resolveAll([]).map(s => s.id)).toEqual(['a']);
       expect(registry.resolveAll(undefined).map(s => s.id)).toEqual(['a']);
+    });
+
+    it('should resolve a cleared selection to no scorer', () => {
+      const registry = registryOf('a', 'b');
+
+      expect(registry.resolveAll([])).toEqual([]);
     });
 
     it('should fall back to the default scorer when every id is unknown',

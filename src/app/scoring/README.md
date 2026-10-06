@@ -8,6 +8,7 @@ between `0.0` and `1.0`.
 | --- | --- |
 | `scorer.ts` | The `Scorer` contract plus the `ScoringRequest` / `ScoreResult` shapes. |
 | `scorer.registry.ts` | The `SCORERS` token listing every available scorer, and `ScorerRegistry` for looking them up. |
+| `scorer-selection.ts` | `ScorerSelection`, which reads and edits the selection held in `AppConfig`. |
 | `scorers/` | The scorer implementations. |
 
 `EvalService` never talks to a scorer directly; it resolves the one named by

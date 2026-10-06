@@ -52,12 +52,12 @@ export class ScorerRegistry {
     return this.scorers;
   }
 
-  /** Identifier of the scorer used when the config does not name one. */
+  /** Identifier of the scorer used when the selection is unset. */
   get defaultId(): string {
     return this.scorers[0].id;
   }
 
-  /** The selection applied when the config does not name any scorer. */
+  /** The selection applied when the config leaves it unset. */
   get defaultIds(): string[] {
     return [this.defaultId];
   }
@@ -71,11 +71,17 @@ export class ScorerRegistry {
    * Resolves every scorer named by the configuration.
    * @param ids The configured scorer ids, if any.
    * @returns The matching scorers in registry order, de-duplicated. Unknown
-   *     ids are dropped with a warning; an empty selection falls back to the
-   *     default scorer so a run always produces a score.
+   *     ids are dropped with a warning. An absent selection, or one naming only
+   *     unknown ids, falls back to the default scorer. An empty selection means
+   *     the user cleared it and resolves to no scorer.
    */
   resolveAll(ids?: readonly string[]): readonly Scorer[] {
-    const selected = new Set(ids?.length ? ids : this.defaultIds);
+    // A cleared selection stays empty rather than silently restoring the
+    // default; `ScorerSelection.validate` rejects it before a run.
+    if (ids?.length === 0) {
+      return [];
+    }
+    const selected = new Set(ids ?? this.defaultIds);
     for (const id of selected) {
       if (!this.find(id)) {
         console.warn(`Unknown scorer '${id}'. Ignoring it.`);

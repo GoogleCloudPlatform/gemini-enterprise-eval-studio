@@ -23,9 +23,11 @@ export interface AppConfig {
   selectedEngine: string;
   selectedModel: string;
   /**
-   * Identifiers of the scoring strategies to run against every row, in the
-   * order they are applied. Falls back to the first registered scorer when
-   * empty or unset. See scoring/scorer.registry.ts.
+   * Identifiers of the scoring strategies to run against every row, in
+   * registry order, which is the order they are applied. Unset means the first
+   * registered scorer is used. An empty list means the user cleared the
+   * selection, which `ScorerSelection.validate` rejects because a run needs at
+   * least one scoring method. See scoring/scorer.registry.ts.
    */
   selectedScorers?: string[];
   autoRaterModel: string;
