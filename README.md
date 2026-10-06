@@ -44,6 +44,22 @@ For **Run Evaluation**, your input CSV must include `query` and `golden` columns
 | `conversation_id` | No | Groups rows into a single multi-turn conversation sharing session context across turns. Rows without a `conversation_id` run as independent single-turn queries. |
 | `turn` | No (Required if `conversation_id` is set) | Consecutive numeric turn order within a `conversation_id` starting at `0` or `1` (e.g., `1`, `2`, `3`). If a turn ID is missing or non-consecutive, all remaining rows in that conversation are marked `SKIPPED: Incorrect or missing turn ID.` |
 
+## Scoring
+
+Each evaluated row is scored between `0.0` and `1.0` using the method set up
+in the **Scoring Setup** card of the configuration step. The **Auto Rater (LLM
+as a judge)** method asks a Gemini model to rate the fetched response against
+the `golden` response:
+
+| Setting | Description |
+| :--- | :--- |
+| **Auto Rater Model** | The Gemini model that rates each response. |
+| **Auto Rater Instruction** | The rubric and scoring scale the model follows. Must be at least 20 characters long. |
+
+**Next** stays disabled, with the reason shown in the card, until a scoring
+method is selected and its settings are complete. To add a scoring method, see
+[`src/app/scoring/README.md`](src/app/scoring/README.md).
+
 ## Data Privacy and Governance
 
 To ensure security and compliance with enterprise data policies, Gemini

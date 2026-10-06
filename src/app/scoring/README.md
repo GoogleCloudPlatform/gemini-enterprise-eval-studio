@@ -14,6 +14,10 @@ between `0.0` and `1.0`.
 `EvalService` never talks to a scorer directly; it resolves the one named by
 `AppConfig.selectedScorers` through `ScorerRegistry` and delegates to it.
 
+The scoring controls themselves live in a single component,
+`components/shared/scoring-setup`, so anything a scorer contributes shows up
+wherever the scoring setup is offered.
+
 ## Adding a scorer
 
 1. **Implement `Scorer`** in `scorers/`, as a root-provided Angular service so
@@ -42,10 +46,12 @@ between `0.0` and `1.0`.
    ],
    ```
 
-That is all that is required. The configuration form picks the new scorer up
-automatically: the **Scoring Method** dropdown appears as soon as more than one
+That is all that is required. The scoring setup picks the new scorer up
+automatically: the **Scoring Methods** list appears as soon as more than one
 scorer is registered, and the first entry in the list is the default. The
-factory must return at least one scorer; an empty list fails to compile.
+factory must return at least one scorer; an empty list fails to compile. At
+least one scoring method must stay selected; clearing them all surfaces an
+inline error and disables the **Next** button.
 
 ## Calling a model
 
@@ -60,10 +66,10 @@ Override these on your scorer when the defaults do not fit:
 
 - `requiresGolden` — set to `false` for reference-free scorers (safety,
   groundedness, …). Rows without a golden answer are skipped when it is `true`.
-- `configKeys` — the `AppConfig` keys your scorer reads. The configuration form
+- `configKeys` — the `AppConfig` keys your scorer reads. The scoring setup
   renders only the inputs belonging to the selected scorer, so a new setting
-  needs a field on `AppConfig`, an input in `config-form.component.html` guarded
-  by `usesConfigKey('yourKey')`, and the key listed here.
+  needs a field on `AppConfig`, an input in `scoring-setup.component.html`
+  guarded by `usesConfigKey('yourKey')`, and the key listed here.
 - `validate(config)` — return an error message when the scorer cannot run with
   the current configuration; the wizard blocks the **Next** button while one is
   returned. Return only the first problem found, so the user fixes one at a

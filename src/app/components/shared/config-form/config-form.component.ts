@@ -22,10 +22,14 @@ import {Subject} from 'rxjs';
 import {takeUntil} from 'rxjs/operators';
 
 import {AppConfig, CollectionComponent, DataStoreComponent, Engine, WidgetConfigResponse} from '../../../models/app-config.model';
+import {ScorerSelection} from '../../../scoring/scorer-selection';
+import {listAutoRaterModels} from '../../../scoring/scorers/auto-rater.scorer';
 import {AuthService} from '../../../services/auth.service';
 import {EvalBackendService} from '../../../services/eval-backend.service';
 import {StateService} from '../../../services/state.service';
 import {InfoTooltipComponent} from '../../shared/info-tooltip/info-tooltip.component';
+import {ScoringSetupComponent} from '../../shared/scoring-setup/scoring-setup.component';
+
 
 /**
  * Represents a connector option for selection in the UI.
@@ -104,7 +108,12 @@ const DATA_SOURCE_DISPLAY_NAMES: Record<string, string> =
 @Component({
   selector: 'app-config-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, InfoTooltipComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    InfoTooltipComponent,
+    ScoringSetupComponent,
+  ],
   templateUrl: './config-form.component.html'
 })
 export class ConfigFormComponent implements OnInit, OnDestroy {
@@ -124,8 +133,12 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     enableWebSearch: false
   };
 
-  autoRaterModels: string[] = ['gemini-3.1-pro-preview', 'gemini-3.5-flash'];
-  autoRaterErrorMessage = '';
+  /**
+   * The auto-rater models on offer. Rendered by `ScoringSetupComponent`; kept
+   * here so an incoming configuration that names no model, or one this auth
+   * mode cannot use, is defaulted and persisted before a run starts.
+   */
+  autoRaterModels: string[] = listAutoRaterModels(true);
 
   engines: Engine[] = [];
   models: string[] = [];
@@ -140,26 +153,30 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
       private readonly stateService: StateService,
       private readonly cdr: ChangeDetectorRef,
       readonly authService: AuthService,
-      private readonly evalBackendService: EvalBackendService
+      private readonly evalBackendService: EvalBackendService,
+      private readonly scorerSelection: ScorerSelection,
   ) {}
 
   ngOnInit() {
     if (!this.authService.showCredentialInputs) {
-      this.autoRaterModels = ['gemini-3.5-flash', 'gemini-3.1-pro'];
+      this.autoRaterModels = listAutoRaterModels(false);
     }
 
     this.stateService.config$.pipe(takeUntil(this.destroy$))
         .subscribe((c: AppConfig) => {
           const engineChanged = this.config.selectedEngine !== c.selectedEngine;
           this.config = structuredClone(c);
+          // Reconcile everything before persisting once: `setConfig` emits
+          // synchronously back into this subscriber.
+          const scorersChanged = this.scorerSelection.normalize(this.config);
           if (this.engines.length > 0) {
             this.updateModelsForSelectedEngine();
             if (engineChanged) {
               this.fetchConnectorsForSelectedEngine();
             }
           }
-          if (this.autoRaterModels.length > 0 && (!this.config.autoRaterModel || !this.autoRaterModels.includes(this.config.autoRaterModel))) {
-            this.config.autoRaterModel = this.autoRaterModels[0];
+          const autoRaterModelChanged = this.normalizeAutoRaterModel();
+          if (scorersChanged || autoRaterModelChanged) {
             this.onConfigChange();
           }
         });
@@ -248,10 +265,6 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
         });
   }
 
-  /**
-  /**
-   * Handles engine selection change, updating available models.
-   */
   /** Populates models list based on selected engine, without resetting selectedModel if it's valid. */
   updateModelsForSelectedEngine() {
     const selected =
@@ -581,6 +594,28 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   }
 
   /**
+   * Reconciles the auto-rater model with the models this auth mode offers. A
+   * missing model, or one not on offer, becomes the first model offered. When
+   * no model is offered at all, the model is cleared instead, so validation
+   * flags it rather than a run using a model the user can neither see nor
+   * change. Like `ScorerSelection.normalize`, edits the configuration in place
+   * and leaves persistence to the caller.
+   * @returns Whether the model changed and is worth persisting.
+   */
+  private normalizeAutoRaterModel(): boolean {
+    const models = this.autoRaterModels;
+    if (models.includes(this.config.autoRaterModel)) {
+      return false;
+    }
+    const fallback = models.length > 0 ? models[0] : '';
+    if (this.config.autoRaterModel === fallback) {
+      return false;
+    }
+    this.config.autoRaterModel = fallback;
+    return true;
+  }
+
+  /**
    * Checks if the form is valid and user can proceed to next step.
    * @returns True if form is valid, false otherwise.
    */
@@ -597,7 +632,9 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
       return !this.authService.showCredentialInputs || !!this.config.gCloudToken;
     }
 
-    if (!this.config.autoRaterModel) {
+    // Covers both an empty selection and a selected scorer whose own settings
+    // are incomplete, such as the auto rater without a model.
+    if (this.scorerSelection.validate(this.config)) {
       return false;
     }
 
@@ -605,7 +642,8 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
       return !!this.config.gCloudToken;
     }
 
-    return true;  }
+    return true;
+  }
 
   /**
    * Saves config and emits next event.

@@ -327,7 +327,8 @@ describe('ConfigFormComponent', () => {
         region: 'global',
         selectedEngine: 'engine',
         selectedModel: 'model',
-        autoRaterModel: 'gemini-3.1-pro-preview',        autoRaterInstruction: '',
+        autoRaterModel: 'gemini-3.1-pro-preview',
+        autoRaterInstruction: 'Rate the response against the golden answer.',
         selectedDataStores: [],
         enableWebSearch: false
       };
@@ -374,7 +375,7 @@ describe('ConfigFormComponent', () => {
             selectedEngine: 'engine',
             selectedModel: 'model',
             autoRaterModel: 'gemini-3.5-flash',
-            autoRaterInstruction: '',
+            autoRaterInstruction: 'Rate the response against the golden answer.',
             selectedDataStores: [],
             enableWebSearch: false,
             gCloudToken: ''
@@ -450,6 +451,20 @@ describe('ConfigFormComponent', () => {
 
          expect(component.config.autoRaterModel).toBe('gemini-3.5-flash');
        });
+
+    it('should clear autoRaterModel when no model is offered', () => {
+      mockStateService.setConfig.calls.reset();
+      component.autoRaterModels = [];
+
+      configSubject.next(
+          {...configSubject.value, autoRaterModel: 'gemini-3.5-flash'});
+
+      // Cleared rather than kept, so validation flags it instead of a run
+      // using a model the user can neither see nor change.
+      expect(component.config.autoRaterModel).toBe('');
+      expect(mockStateService.setConfig)
+          .toHaveBeenCalledWith(jasmine.objectContaining({autoRaterModel: ''}));
+    });
 
     it('should fetch connectors if selectedEngine changes in config$', () => {
       const fixture = TestBed.createComponent(ConfigFormComponent);

@@ -181,54 +181,19 @@
     </div>
   </div>
 
-  <!-- Auto Rater Setup Card -->
+  <!-- Scoring Setup Card -->
   <div *ngIf="!isRunQueries" class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-    <h3 class="text-lg font-medium mb-4 text-gray-800">Auto Rater Setup</h3>
-    <div class="space-y-4">
-      <div>
-        <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
-          ><span>Auto Rater Model</span
-          ><app-info-tooltip
-            class="inline-flex"
-            text="The Gemini model to use for auto-rating."
-          ></app-info-tooltip
-        ></label>
-        <select
-          aria-label="Auto Rater Model"
-          [(ngModel)]="config.autoRaterModel"
-          (ngModelChange)="onConfigChange()"
-          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-          [disabled]="autoRaterModels.length === 0"
-        >
-          <option *ngFor="let m of autoRaterModels" [value]="m">{{ m }}</option>
-        </select>
-        <div *ngIf="autoRaterErrorMessage" class="mt-1 text-xs text-red-600">
-          {{ autoRaterErrorMessage }}
-        </div>
-      </div>
-      <div>
-        <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
-          ><span>Auto Rater Instruction</span
-          ><app-info-tooltip
-            class="inline-flex"
-            text="Instructions for the Gemini model acting as an auto-rater. Define the rubric or metric for scoring here. The model must output a score between 0.0 and 1.0."
-          ></app-info-tooltip
-        ></label>
-        <textarea
-          aria-label="Auto Rater Instruction"
-          [(ngModel)]="config.autoRaterInstruction"
-          (ngModelChange)="onConfigChange()"
-          rows="6"
-          class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-          placeholder="Enter evaluation instructions..."
-        ></textarea>
-      </div>
-    </div>
+    <h3 class="text-lg font-medium mb-4 text-gray-800">Scoring Setup</h3>
+    <app-scoring-setup
+      [config]="config"
+      (configChange)="onConfigChange()"
+    ></app-scoring-setup>
   </div>
 
   <!-- Next Button -->
   <div class="md:col-span-2 flex justify-end">
     <button
+      data-test-id="config-form-next-button"
       (click)="onNext()"
       [disabled]="!canProceed()"
       class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
