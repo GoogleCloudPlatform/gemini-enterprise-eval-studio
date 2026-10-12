@@ -15,7 +15,7 @@
  */
 
 import {CommonModule} from '@angular/common';
-import {Component, Input} from '@angular/core';
+import {ChangeDetectorRef, Component, ElementRef, Input, OnDestroy, ViewChild} from '@angular/core';
 
 /**
  * Component for displaying an information tooltip.
@@ -26,6 +26,51 @@ import {Component, Input} from '@angular/core';
   imports: [CommonModule],
   templateUrl: './info-tooltip.component.html'
 })
-export class InfoTooltipComponent {
+export class InfoTooltipComponent implements OnDestroy {
   @Input() text = '';
+  @Input() icon: 'info'|'question' = 'info';
+  @Input() align: 'left'|'right' = 'left';
+
+  @ViewChild('trigger') triggerRef?: ElementRef<HTMLElement>;
+
+  tooltipStyle: Record<string, string> = {};
+
+  constructor(private readonly cdr: ChangeDetectorRef) {}
+
+  private readonly onViewportChange = () => {
+    this.updatePosition();
+    this.cdr.markForCheck();
+  };
+
+  onMouseEnter() {
+    this.updatePosition();
+    if (this.align === 'right') {
+      window.addEventListener('scroll', this.onViewportChange, true);
+      window.addEventListener('resize', this.onViewportChange);
+    }
+  }
+
+  onMouseLeave() {
+    this.removeViewportListeners();
+  }
+
+  ngOnDestroy() {
+    this.removeViewportListeners();
+  }
+
+  updatePosition() {
+    if (this.align !== 'right' || !this.triggerRef) {
+      return;
+    }
+    const rect = this.triggerRef.nativeElement.getBoundingClientRect();
+    this.tooltipStyle = {
+      bottom: `${window.innerHeight - rect.top + 8}px`,
+      right: `${window.innerWidth - rect.right}px`,
+    };
+  }
+
+  private removeViewportListeners() {
+    window.removeEventListener('scroll', this.onViewportChange, true);
+    window.removeEventListener('resize', this.onViewportChange);
+  }
 }

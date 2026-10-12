@@ -19,7 +19,7 @@ import {ComponentFixture, TestBed, fakeAsync, tick} from '@angular/core/testing'
 import {BehaviorSubject, of} from 'rxjs';
 
 import {AppConfig} from '../../models/app-config.model';
-import {ResultRow} from '../../models/result-row.model';
+import {ResultRow, TRACE_COLUMN_TOOLTIP} from '../../models/result-row.model';
 import {ScoreResult, Scorer, ScorerRunResult, ScoringRequest} from '../../scoring/scorer';
 import {SCORERS} from '../../scoring/scorer.registry';
 import {AuthService} from '../../services/auth.service';
@@ -1294,4 +1294,73 @@ describe('RunEvaluationComponent', () => {
       expect(component.reRateConfig).not.toBeNull();
     });
   });
+
+  it('should render a question mark tooltip on the Trace column header explaining trace persistence delay',
+     () => {
+       const fixture = TestBed.createComponent(RunEvaluationComponent);
+       const component = fixture.componentInstance;
+       component.step = 3;
+       fixture.detectChanges();
+
+       const traceColumn = component.columns.find(c => c.key === 'traceUrl');
+       expect(traceColumn?.tooltip).toBe(TRACE_COLUMN_TOOLTIP);
+       expect(traceColumn?.tooltipAlign).toBe('right');
+
+       const headers =
+           Array.from(fixture.nativeElement.querySelectorAll('th')) as
+           HTMLElement[];
+       const traceHeader =
+           headers.find(th => th.textContent?.includes('Trace'));
+       expect(traceHeader).toBeDefined();
+
+       const tooltipEl = traceHeader!.querySelector('app-info-tooltip');
+       expect(tooltipEl).not.toBeNull();
+       expect(tooltipEl!.querySelector('svg[role="img"][aria-label="Help"]'))
+           .not.toBeNull();
+       expect(tooltipEl!.textContent).toContain(TRACE_COLUMN_TOOLTIP);
+
+       const triggerEl = tooltipEl!.querySelector('.group') as HTMLElement;
+       const rectSpy = spyOn(triggerEl, 'getBoundingClientRect').and.returnValue({
+         top: 100,
+         right: 500,
+         bottom: 120,
+         left: 480,
+         width: 20,
+         height: 20,
+         x: 480,
+         y: 100,
+         toJSON: () => ({})
+       });
+
+       triggerEl.dispatchEvent(new MouseEvent('mouseenter'));
+       fixture.detectChanges();
+
+       const popupEl = tooltipEl!.querySelector('.fixed') as HTMLElement;
+       expect(popupEl.classList.contains('pointer-events-none')).toBeFalse();
+       expect(popupEl.style.bottom).toBe(`${window.innerHeight - 100 + 8}px`);
+       expect(popupEl.style.right).toBe(`${window.innerWidth - 500}px`);
+
+       rectSpy.and.returnValue({
+         top: 80,
+         right: 450,
+         bottom: 100,
+         left: 430,
+         width: 20,
+         height: 20,
+         x: 430,
+         y: 80,
+         toJSON: () => ({})
+       });
+       window.dispatchEvent(new Event('scroll'));
+       fixture.detectChanges();
+
+       expect(popupEl.style.bottom).toBe(`${window.innerHeight - 80 + 8}px`);
+       expect(popupEl.style.right).toBe(`${window.innerWidth - 450}px`);
+
+       triggerEl.dispatchEvent(new MouseEvent('mouseleave'));
+
+       const queryHeader =
+           headers.find(th => th.textContent?.trim() === 'Query');
+       expect(queryHeader?.querySelector('app-info-tooltip')).toBeNull();
+     });
 });

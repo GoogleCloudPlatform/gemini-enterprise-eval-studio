@@ -17,6 +17,7 @@
 import {CommonModule} from '@angular/common';
 import {ChangeDetectorRef, Component} from '@angular/core';
 
+import {TRACE_COLUMN_TOOLTIP} from '../../models/result-row.model';
 import {CsvService} from '../../services/csv.service';
 import {EvalService} from '../../services/eval.service';
 import {StateService} from '../../services/state.service';
@@ -51,7 +52,9 @@ export class RunQueriesComponent {
       header: 'Trace',
       key: 'traceUrl',
       type: 'link',
-      linkText: 'View Trace'
+      linkText: 'View Trace',
+      tooltip: TRACE_COLUMN_TOOLTIP,
+      tooltipAlign: 'right'
     }
   ];
   responseFile: File|null = null;

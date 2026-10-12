@@ -21,7 +21,7 @@ import {distinctUntilChanged, map, takeUntil} from 'rxjs/operators';
 
 import {AppConfig} from '../../models/app-config.model';
 import {CSVRow} from '../../models/csv-row.model';
-import {ResultRow} from '../../models/result-row.model';
+import {ResultRow, TRACE_COLUMN_TOOLTIP} from '../../models/result-row.model';
 import {scoreColumnHeader, scoreErrorColumnHeader} from '../../scoring/score-columns';
 import {Scorer, ScorerRunResult, firstScorerError} from '../../scoring/scorer';
 import {ScorerRegistry} from '../../scoring/scorer.registry';
@@ -53,7 +53,9 @@ const TRACE_COLUMN: ColumnDef = {
   header: 'Trace',
   key: 'traceUrl',
   type: 'link',
-  linkText: 'View Trace'
+  linkText: 'View Trace',
+  tooltip: TRACE_COLUMN_TOOLTIP,
+  tooltipAlign: 'right'
 };
 
 /** Column key holding a given scorer's score on a displayed row. */

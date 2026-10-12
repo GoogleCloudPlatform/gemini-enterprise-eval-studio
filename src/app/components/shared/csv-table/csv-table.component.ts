@@ -18,6 +18,7 @@ import {CommonModule, formatDate} from '@angular/common';
 import {Component, Input, OnChanges} from '@angular/core';
 
 import {CsvService} from '../../../services/csv.service';
+import {InfoTooltipComponent} from '../info-tooltip/info-tooltip.component';
 
 declare var marked: any;
 
@@ -32,12 +33,14 @@ export interface ColumnDef {
   linkText?: string;
   truncate?: boolean;
   width?: string;
+  tooltip?: string;
+  tooltipAlign?: 'left'|'right';
 }
 
 @Component({
   selector: 'app-csv-table',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, InfoTooltipComponent],
   templateUrl: './csv-table.component.html'
 })
 /**

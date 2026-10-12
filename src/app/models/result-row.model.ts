@@ -17,6 +17,12 @@
 import {ScorerRunResult} from '../scoring/scorer';
 
 /**
+ * Tooltip text for the Trace column header explaining trace persistence delay.
+ */
+export const TRACE_COLUMN_TOOLTIP =
+    'Trace links might take some time to appear as traces aren\'t persisted in real time and take some time after Gemini Enterprise has responded.';
+
+/**
  * Represents a row in the evaluation results.
  */
 export interface ResultRow {

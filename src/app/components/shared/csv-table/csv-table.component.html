@@ -20,7 +20,16 @@
             class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
             [ngClass]="col.width ? col.width : (col.truncate ? 'w-96' : '')"
           >
-            {{ col.header }}
+            <div class="inline-flex items-center gap-1">
+              <span>{{ col.header }}</span>
+              <app-info-tooltip
+                *ngIf="col.tooltip"
+                class="inline-flex"
+                [text]="col.tooltip"
+                icon="question"
+                [align]="col.tooltipAlign || 'left'"
+              ></app-info-tooltip>
+            </div>
           </th>
         </tr>
       </thead>
