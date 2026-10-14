@@ -36,6 +36,11 @@ export interface ScoringRequest {
 export interface ScoreResult {
   /** Normalized score, where 0.0 is the worst and 1.0 the best. */
   score: number;
+  /**
+   * Optional scorer-specific sub-metrics (e.g., recall, precision,
+   * matchedWords), logged when the scorer runs to aid debugging.
+   */
+  details?: Record<string, number>;
 }
 
 /**

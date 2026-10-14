@@ -406,6 +406,11 @@ export class EvalService {
       try {
         const result = await scorer.score(request);
         entry.score = result.score;
+        if (result.details) {
+          console.debug(
+              `Scorer '${scorer.id}' details:`,
+              {query: request.query, ...result.details});
+        }
       } catch (error) {
         console.error(
             `Error scoring response with '${scorer.id}' during evaluation:`,

@@ -20,6 +20,7 @@ import {AppConfig} from '../models/app-config.model';
 import {ScoreResult, Scorer, ScoringRequest} from '../scoring/scorer';
 import {SCORERS} from '../scoring/scorer.registry';
 import {AUTO_RATER_SCORER_ID} from '../scoring/scorers/auto-rater.scorer';
+import {LCS_SCORER_ID} from '../scoring/scorers/lcs.scorer';
 import {MockEvalBackendService} from '../testing/mocks';
 
 import {EvalBackendService} from './eval-backend.service';
@@ -229,6 +230,91 @@ describe('EvalService', () => {
 
       expect(results.map(result => result.scorerId)).toEqual(['first']);
     });
+
+    it('should log scorer details when a scorer returns them and stay silent otherwise',
+       async () => {
+         const debugSpy = spyOn(console, 'debug');
+         const withDetails = new FakeScorer(
+             'with-details', 'With Details',
+             async () => ({
+               score: 0.5,
+               details: {recall: 0.6, precision: 0.4},
+             }));
+         const withoutDetails = new FakeScorer(
+             'without-details', 'Without Details', async () => ({score: 0.8}));
+         const service = setUp([withDetails, withoutDetails]);
+
+         await service.scoreAll({
+           query: 'q',
+           response: 'r',
+           golden: 'g',
+           config: {
+             ...CONFIG,
+             selectedScorers: ['with-details', 'without-details'],
+           },
+         });
+
+         expect(debugSpy).toHaveBeenCalledTimes(1);
+         expect(debugSpy).toHaveBeenCalledWith(
+             `Scorer 'with-details' details:`,
+             {query: 'q', recall: 0.6, precision: 0.4});
+       });
+
+    it('should score with the built-in LCS scorer without calling the backend and log its details',
+       async () => {
+         const debugSpy = spyOn(console, 'debug');
+         const builtInService = setUp();
+
+         const results = await builtInService.scoreAll({
+           query: 'How do I reset my password?',
+           response:
+               'Go to Settings and under Security you can reset the password.',
+           golden: 'Reset your password in Settings under Security.',
+           config: {...CONFIG, selectedScorers: [LCS_SCORER_ID]},
+         });
+
+         expect(mockBackendService.callScoreSpy).not.toHaveBeenCalled();
+         expect(results).toEqual([{
+           scorerId: LCS_SCORER_ID,
+           displayName: 'Longest Common Subsequence',
+           score: 0.33,
+         }]);
+         expect(debugSpy).toHaveBeenCalledWith(
+             `Scorer '${LCS_SCORER_ID}' details:`, {
+               query: 'How do I reset my password?',
+               recall: 0.43,
+               precision: 0.27,
+               matchedWords: 3,
+             });
+       });
+
+    it('should still record the built-in LCS score when the Auto Rater fails',
+       async () => {
+         const builtInService = setUp();
+         mockBackendService.callScoreSpy.and.returnValue(Promise.resolve(
+             new Response('', {status: 500, statusText: 'Server Error'})));
+
+         const results = await builtInService.scoreAll({
+           query: 'How do I reset my password?',
+           response:
+               'Go to Settings and under Security you can reset the password.',
+           golden: 'Reset your password in Settings under Security.',
+           config: {
+             ...CONFIG,
+             selectedScorers: [AUTO_RATER_SCORER_ID, LCS_SCORER_ID],
+           },
+         });
+
+         expect(results.length).toBe(2);
+         expect(results[0].scorerId).toBe(AUTO_RATER_SCORER_ID);
+         expect(results[0].score).toBe(0);
+         expect(results[0].error).toContain('HTTP error! status: 500');
+         expect(results[1]).toEqual({
+           scorerId: LCS_SCORER_ID,
+           displayName: 'Longest Common Subsequence',
+           score: 0.33,
+         });
+       });
   });
 
   describe('processRow', () => {

@@ -23,6 +23,7 @@ import {MockEvalBackendService} from '../testing/mocks';
 import {ScoreResult, Scorer, ScoringRequest} from './scorer';
 import {SCORERS, ScorerRegistry} from './scorer.registry';
 import {AUTO_RATER_SCORER_ID} from './scorers/auto-rater.scorer';
+import {LCS_SCORER_ID} from './scorers/lcs.scorer';
 
 /** Minimal scorer used to verify the registry stays strategy agnostic. */
 class FakeScorer extends Scorer {
@@ -51,25 +52,50 @@ describe('ScorerRegistry', () => {
       registry = TestBed.inject(ScorerRegistry);
     });
 
-    it('should register the auto rater', () => {
-      expect(registry.list().map(s => s.id)).toContain(AUTO_RATER_SCORER_ID);
+    it('should register the auto rater and LCS scorer in display order', () => {
+      expect(registry.list().map(s => s.id)).toEqual([
+        AUTO_RATER_SCORER_ID,
+        LCS_SCORER_ID,
+      ]);
     });
 
     it('should default to the first registered scorer', () => {
+      expect(registry.defaultId).toBe(AUTO_RATER_SCORER_ID);
       expect(registry.defaultId).toBe(registry.list()[0].id);
     });
 
     it('should look up a scorer by id', () => {
       expect(registry.find(AUTO_RATER_SCORER_ID)?.id).toBe(AUTO_RATER_SCORER_ID);
+      expect(registry.find(LCS_SCORER_ID)?.id).toBe(LCS_SCORER_ID);
     });
 
     it('should not find an unknown id', () => {
       expect(registry.find('does-not-exist')).toBeUndefined();
     });
 
-    it('should require a golden answer for the auto rater', () => {
+    it('should require a golden answer for the auto rater and LCS scorer', () => {
       expect(registry.find(AUTO_RATER_SCORER_ID)?.requiresGolden).toBeTrue();
+      expect(registry.find(LCS_SCORER_ID)?.requiresGolden).toBeTrue();
     });
+
+    it('should require no config keys or model validation for the LCS scorer',
+       () => {
+         const lcs = registry.find(LCS_SCORER_ID)!;
+         const emptyConfig: AppConfig = {
+           gCloudToken: '',
+           projectId: '',
+           region: 'global',
+           selectedEngine: '',
+           selectedModel: '',
+           autoRaterModel: '',
+           autoRaterInstruction: '',
+           selectedDataStores: [],
+           enableWebSearch: false,
+         };
+
+         expect(lcs.configKeys).toEqual([]);
+         expect(lcs.validate(emptyConfig)).toBeUndefined();
+       });
 
     it('should reject an auto rater config without a model', () => {
       const config: AppConfig = {
