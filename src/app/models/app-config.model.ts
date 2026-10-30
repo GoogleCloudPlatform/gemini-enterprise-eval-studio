@@ -23,6 +23,13 @@ export interface AppConfig {
   selectedEngine: string;
   selectedModel: string;
   /**
+   * Resource name of the agent every query in the run is sent to, or empty to
+   * let the engine's default assistant answer. Chosen from the agents
+   * published under the selected engine, so it is cleared whenever the engine
+   * changes, and never persisted. See models/agent.model.ts.
+   */
+  selectedAgent?: string;
+  /**
    * Identifiers of the scoring strategies to run against every row, in
    * registry order, which is the order they are applied. Unset means the first
    * registered scorer is used. An empty list means the user cleared the

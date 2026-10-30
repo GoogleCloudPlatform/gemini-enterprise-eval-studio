@@ -77,8 +77,8 @@ export class StateService {
       }
     }
 
-    const {gCloudToken, selectedEngine, selectedModel, ...safeConfig} =
-        savedConfig;
+    const {gCloudToken, selectedEngine, selectedModel, selectedAgent,
+           ...safeConfig} = savedConfig;
 
     return {
       ...defaultConfig,
@@ -86,6 +86,7 @@ export class StateService {
       gCloudToken: '',
       selectedEngine: '',
       selectedModel: '',
+      selectedAgent: '',
     };
   }
 
@@ -119,8 +120,11 @@ export class StateService {
     const clonedConfig = structuredClone(config);
     this.configSubject.next(clonedConfig);
 
-    const {gCloudToken, selectedEngine, selectedModel, ...localConfig} =
-        clonedConfig;
+    // The engine-scoped choices are deliberately not persisted: an agent
+    // belongs to one engine, and restoring it before that engine is selected
+    // again would point the next run at something nobody chose.
+    const {gCloudToken, selectedEngine, selectedModel, selectedAgent,
+           ...localConfig} = clonedConfig;
 
     this.storageWrite$.next(localConfig);
   }

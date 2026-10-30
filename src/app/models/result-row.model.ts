@@ -45,6 +45,13 @@ export interface ResultRow {
   projectId?: string;
   region?: string;
   engineId?: string;
+  /**
+   * Id of the agent that answered, or empty when the row ran against the
+   * engine's default assistant. Recorded beside `engineId` because the same
+   * query against the same engine scores differently per agent, so a run is
+   * not reproducible without knowing which agent served it.
+   */
+  agentId?: string;
   traceId?: string;
   traceUrl?: string;
   /** Conversation grouping id, present only for multi-turn rows. */
