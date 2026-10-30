@@ -43,7 +43,11 @@
 
   <!-- Configuration Form -->
   <div [hidden]="step !== 1">
-    <app-config-form [isRunQueries]="true" (next)="nextStep()"></app-config-form>
+    <app-config-form
+      [isRunQueries]="true"
+      [locked]="isProcessingResponse"
+      (next)="nextStep()"
+    ></app-config-form>
   </div>
 
   <!-- File Upload -->

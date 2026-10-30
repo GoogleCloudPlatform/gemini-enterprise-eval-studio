@@ -334,6 +334,38 @@ describe('EvalService', () => {
           content => ({answer: {replies: [{groundedContent: {content}}]}})))));
     }
 
+    it('should run against the settings it is given rather than the current ones',
+       async () => {
+         mockBackendService.callAssistSpy.and.returnValue(fetched('hi'));
+         const getCurrentConfig =
+             spyOn(service['stateService'], 'getCurrentConfig')
+                 .and.returnValue({...config, selectedEngine: 'edited'});
+
+         const result = await service.processRow(
+             {query: 'q', golden: ''}, undefined, undefined,
+             {...config, selectedEngine: 'pinned', selectedModel: 'm1'});
+
+         const request = mockBackendService.callAssistSpy.calls.mostRecent().args[0];
+         expect(request.selectedEngine).toBe('pinned');
+         expect(request.body.generationSpec).toEqual({modelId: 'm1'});
+         expect(result.engineId).toBe('pinned');
+         expect(getCurrentConfig).not.toHaveBeenCalled();
+       });
+
+    it('should fall back to the current settings when none are given',
+       async () => {
+         mockBackendService.callAssistSpy.and.returnValue(fetched('hi'));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue({...config, selectedEngine: 'current'});
+
+         const result = await service.processRow({query: 'q', golden: ''});
+
+         expect(mockBackendService.callAssistSpy.calls.mostRecent()
+                    .args[0].selectedEngine)
+             .toBe('current');
+         expect(result.engineId).toBe('current');
+       });
+
     it('should collect the thinking trace one thought per line, keeping it out of the fetched answer',
        async () => {
          mockBackendService.callAssistSpy.and.returnValue(streamed(

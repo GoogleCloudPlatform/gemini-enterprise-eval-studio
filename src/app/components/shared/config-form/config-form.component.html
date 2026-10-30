@@ -1,3 +1,13 @@
+<div
+  *ngIf="locked"
+  data-test-id="config-form-locked-notice"
+  class="mb-4 p-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md"
+>
+  Settings are locked while a run is in progress, so every row uses the same settings.
+</div>
+<!-- A disabled fieldset disables every native control inside it, including
+     those rendered by child components. -->
+<fieldset [disabled]="locked" class="min-w-0 m-0 p-0 border-0">
 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
   <!-- Engine Selection Card -->
   <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
@@ -189,16 +199,19 @@
       (configChange)="onConfigChange()"
     ></app-scoring-setup>
   </div>
+</div>
+</fieldset>
 
-  <!-- Next Button -->
-  <div class="md:col-span-2 flex justify-end">
-    <button
-      data-test-id="config-form-next-button"
-      (click)="onNext()"
-      [disabled]="!canProceed()"
-      class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
-    >
-      Next
-    </button>
-  </div>
+<!-- Next Button. Kept outside the fieldset so that it still works while the
+     settings are locked: a user who comes back to this step mid-run can return
+     to the run with it. -->
+<div class="mt-6 flex justify-end">
+  <button
+    data-test-id="config-form-next-button"
+    (click)="onNext()"
+    [disabled]="!canProceed()"
+    class="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
+  >
+    Next
+  </button>
 </div>

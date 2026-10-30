@@ -85,6 +85,47 @@ describe('ConfigFormComponent', () => {
     expect(component).toBeTruthy();
   });
 
+  describe('locked', () => {
+    function fieldset(): HTMLFieldSetElement {
+      return (fixture.nativeElement as HTMLElement).querySelector('fieldset')!;
+    }
+
+    function notice(): Element|null {
+      return (fixture.nativeElement as HTMLElement)
+          .querySelector('[data-test-id="config-form-locked-notice"]');
+    }
+
+    it('should leave the form editable by default', () => {
+      expect(fieldset().disabled).toBeFalse();
+      expect(notice()).toBeNull();
+    });
+
+    it('should disable every control and explain why while locked', () => {
+      fixture.componentRef.setInput('locked', true);
+      fixture.detectChanges();
+
+      expect(fieldset().disabled).toBeTrue();
+      expect(notice()?.textContent)
+          .toContain('Settings are locked while a run is in progress');
+      const projectId =
+          (fixture.nativeElement as HTMLElement)
+              .querySelector('#projectId') as HTMLInputElement;
+      expect(projectId.matches(':disabled')).toBeTrue();
+    });
+
+    it('should keep Next usable while locked so the user can return to the run',
+       () => {
+         spyOn(component, 'canProceed').and.returnValue(true);
+         fixture.componentRef.setInput('locked', true);
+         fixture.detectChanges();
+
+         const next = (fixture.nativeElement as HTMLElement)
+                          .querySelector<HTMLButtonElement>(
+                              '[data-test-id="config-form-next-button"]')!;
+         expect(next.matches(':disabled')).toBeFalse();
+       });
+  });
+
   describe('fetchEngines', () => {
     it('should set error message if project ID is missing', () => {
       component.config.projectId = '';

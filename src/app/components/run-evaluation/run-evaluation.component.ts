@@ -267,6 +267,9 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
   async startEvaluation(event: {file: File, rows: CSVRow[]}) {
     if (this.isProcessing) return;
     const runId = ++this.currentRunId;
+    // Every row of the run uses the settings captured here, when the run
+    // starts.
+    const runConfig = this.stateService.getCurrentConfig();
     this.uploadedRows = event.rows;
     this.errorMessage = null;
     this.isProcessing = true;
@@ -338,8 +341,8 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
             expectedTurn!++;
           }
 
-          const result =
-              await this.evalService.processRow(row, undefined, session);
+          const result = await this.evalService.processRow(
+              row, undefined, session, runConfig);
           session = result.session;
           if (runId !== this.currentRunId || !this.isProcessing) return;
 

@@ -16,6 +16,7 @@
 
 import {Injectable} from '@angular/core';
 
+import {AppConfig} from '../models/app-config.model';
 import {CSVRow} from '../models/csv-row.model';
 import {ResultRow} from '../models/result-row.model';
 import {ScorerRunResult, ScoringRequest} from '../scoring/scorer';
@@ -71,14 +72,18 @@ export class EvalService {
    * @param row The CSV row to process.
    * @param onProgress Optional callback for progress updates.
    * @param session Optional session resource name to continue a multi-turn conversation.
+   * @param config The settings to run the row against. A caller running a
+   *     batch passes the settings captured when the run started, so every
+   *     row in the run uses the same settings. Defaults to the current
+   *     settings.
    * @returns A promise that resolves to the ResultRow.
    */
   async processRow(
       row: CSVRow,
       onProgress?: (step: 'fetch'|'score') => void,
       session?: string,
+      config: AppConfig = this.stateService.getCurrentConfig(),
   ): Promise<ResultRow> {
-    const config = this.stateService.getCurrentConfig();
 
 
     const toolsSpec: NonNullable<AssistRequestBody['toolsSpec']> = {};

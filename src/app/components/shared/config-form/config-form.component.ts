@@ -120,6 +120,12 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   private readonly destroy$ = new Subject<void>();
   @Output() readonly next = new EventEmitter<void>();
   @Input() isRunQueries = false;
+  /**
+   * Whether a run is in progress. Every row of a run uses the settings
+   * captured when it started, so the form is made read-only meanwhile rather
+   * than accepting edits that would not apply until the next run.
+   */
+  @Input() locked = false;
   @ViewChild('dropdownContainer') dropdownContainer?: ElementRef;
 
   config: AppConfig = {

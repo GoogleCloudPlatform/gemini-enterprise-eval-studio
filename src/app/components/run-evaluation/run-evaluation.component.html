@@ -59,7 +59,7 @@
 
   <!-- Configuration Form -->
   <div [hidden]="step !== 1">
-    <app-config-form (next)="nextStep()"></app-config-form>
+    <app-config-form [locked]="isProcessing" (next)="nextStep()"></app-config-form>
   </div>
 
   <!-- File Upload -->

@@ -153,6 +153,85 @@ describe('RunEvaluationComponent', () => {
     expect(component.isProcessing).toBeFalse();
   }));
 
+  it('should run every row against the settings captured when the run started',
+     fakeAsync(() => {
+       const fixture = TestBed.createComponent(RunEvaluationComponent);
+       const component = fixture.componentInstance;
+       fixture.detectChanges();
+
+       const engines: Array<string|undefined> = [];
+       mockEvalService.processRow.and.callFake(
+           async (row, onProgress, session, config) => {
+         engines.push(config?.selectedEngine);
+         // The settings change while the run is in flight.
+         configSubject.next(
+             {...configSubject.value, selectedEngine: 'edited-engine'});
+         return {
+           query: row.query,
+           golden: row.golden,
+           fetched: 'fetched',
+           ttft: 0,
+           ttfa: 0,
+           ttlt: 0,
+           scorerResults: []
+         };
+       });
+
+       component.startEvaluation({
+         file: new File([], 'test.csv'),
+         rows: [
+           {query: 'q1', golden: 'g1'}, {query: 'q2', golden: 'g2'},
+           {query: 'q3', golden: 'g3'}
+         ]
+       });
+       tick();
+
+       expect(engines).toEqual(['engine', 'engine', 'engine']);
+     }));
+
+  it('should lock the settings form only while a run is in progress',
+     fakeAsync(() => {
+       const fixture = TestBed.createComponent(RunEvaluationComponent);
+       const component = fixture.componentInstance;
+       fixture.detectChanges();
+       const element = fixture.nativeElement as HTMLElement;
+       const fieldset = () => element.querySelector(
+                                  'app-config-form fieldset') as HTMLFieldSetElement;
+       const notice = () =>
+           element.querySelector('[data-test-id="config-form-locked-notice"]');
+
+       expect(fieldset().disabled).toBeFalse();
+       expect(notice()).toBeNull();
+
+       let finishRow!: (result: ResultRow) => void;
+       mockEvalService.processRow.and.returnValue(
+           new Promise<ResultRow>(resolve => {
+             finishRow = resolve;
+           }));
+       component.startEvaluation(
+           {file: new File([], 'test.csv'), rows: [{query: 'q1', golden: 'g1'}]});
+       tick();
+       fixture.detectChanges();
+
+       expect(fieldset().disabled).toBeTrue();
+       expect(notice()).not.toBeNull();
+
+       finishRow({
+         query: 'q1',
+         golden: 'g1',
+         fetched: 'fetched',
+         ttft: 0,
+         ttfa: 0,
+         ttlt: 0,
+         scorerResults: []
+       });
+       tick();
+       fixture.detectChanges();
+
+       expect(fieldset().disabled).toBeFalse();
+       expect(notice()).toBeNull();
+     }));
+
   it('should stop evaluation mid-way when stopEvaluation is called', fakeAsync(() => {
     const fixture = TestBed.createComponent(RunEvaluationComponent);
     const component = fixture.componentInstance;

@@ -124,6 +124,9 @@ export class RunQueriesComponent {
   async runResponseGeneration() {
     if (this.isProcessingResponse) return;
     const runId = ++this.currentRunId;
+    // Every row of the run uses the settings captured here, when the run
+    // starts.
+    const runConfig = this.stateService.getCurrentConfig();
     this.isProcessingResponse = true;
     this.responseResults = [];
     this.responseProgress = 0;
@@ -139,7 +142,8 @@ export class RunQueriesComponent {
       if (runId !== this.currentRunId || !this.isProcessingResponse) return;
 
       const csvRow: any = {query: row['query']};
-      const result = await this.evalService.processRow(csvRow);
+      const result = await this.evalService.processRow(
+          csvRow, undefined, undefined, runConfig);
       if (runId !== this.currentRunId || !this.isProcessingResponse) return;
 
       results[rowIndex] = {
