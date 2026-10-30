@@ -15,7 +15,8 @@
  */
 
 import { BehaviorSubject } from 'rxjs';
-import { Engine } from '../models/app-config.model';
+import { Agent } from '../models/agent.model';
+import { AppConfig, Engine, WidgetConfigResponse } from '../models/app-config.model';
 import { AuthProvider, AuthService } from '../services/auth.service';
 import { AssistRequest, EvalBackendService, ScoreRequest } from '../services/eval-backend.service';
 
@@ -35,8 +36,6 @@ export class MockAuthService extends AuthService {
   override logout = jasmine.createSpy('logout');
 }
 
-import {WidgetConfigResponse} from '../models/app-config.model';
-
 /**
  * Mock implementation of EvalBackendService for testing.
  */
@@ -46,6 +45,7 @@ export class MockEvalBackendService extends EvalBackendService {
   fetchEnginesSpy = jasmine.createSpy('fetchEngines').and.returnValue(Promise.resolve([]));
   fetchWidgetConfigSpy = jasmine.createSpy('fetchWidgetConfig').and.returnValue(Promise.resolve(null));
   fetchTraceIdSpy = jasmine.createSpy('fetchTraceId').and.resolveTo(undefined);
+  fetchAgentsSpy = jasmine.createSpy('fetchAgents').and.resolveTo([]);
 
 
   override callAssist(request: AssistRequest): Promise<Response> {
@@ -66,5 +66,9 @@ export class MockEvalBackendService extends EvalBackendService {
 
   override fetchTraceId(projectId: string, assistToken: string): Promise<string | undefined> {
     return this.fetchTraceIdSpy(projectId, assistToken);
+  }
+
+  override fetchAgents(projectId: string, region: string, engineId: string, config: AppConfig): Promise<Agent[]> {
+    return this.fetchAgentsSpy(projectId, region, engineId, config);
   }
 }

@@ -15,6 +15,8 @@
  */
 
 import {TestBed} from '@angular/core/testing';
+
+import {Agent} from '../models/agent.model';
 import {DirectGcpEvalBackendService} from './direct-gcp-eval-backend.service';
 import {StateService} from './state.service';
 
@@ -93,6 +95,98 @@ describe('DirectGcpEvalBackendService', () => {
       await expectAsync(
         service.fetchTraceId('test-project', 'assist-abc')
       ).toBeRejectedWithError('Failed to fetch trace ID: HTTP 403');
+    });
+  });
+
+  describe('fetchAgents', () => {
+    const ENGINE_PATH =
+        'projects/test-project/locations/global/collections/default_collection/engines/test-engine';
+    const AGENT: Agent = {
+      name: `${ENGINE_PATH}/assistants/default_assistant/agents/agent-1`,
+      displayName: 'Agent One',
+      state: 'ENABLED',
+    };
+
+    it('lists agents under the default assistant of a bare engine ID', async () => {
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify({agents: [AGENT]}), {status: 200})
+      );
+
+      const agents = await service.fetchAgents(
+          'test-project', 'global', 'test-engine', stateService.getCurrentConfig());
+
+      expect(agents).toEqual([AGENT]);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://discoveryengine.googleapis.com/v1alpha/${ENGINE_PATH}/assistants/default_assistant/agents?pageSize=1000`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'x-goog-user-project': 'test-project',
+          },
+        }
+      );
+    });
+
+    it('uses a full engine resource name as is, on the regional host', async () => {
+      const enginePath =
+          'projects/test-project/locations/eu/collections/other_collection/engines/e1';
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify({agents: []}), {status: 200})
+      );
+
+      await service.fetchAgents(
+          'test-project', 'eu', enginePath, stateService.getCurrentConfig());
+
+      expect(fetchSpy.calls.mostRecent().args[0]).toBe(
+          `https://eu-discoveryengine.googleapis.com/v1alpha/${enginePath}/assistants/default_assistant/agents?pageSize=1000`);
+    });
+
+    it('returns an empty list when the engine has no agents', async () => {
+      spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify({}), {status: 200})
+      );
+
+      expect(await service.fetchAgents(
+          'test-project', 'global', 'test-engine',
+          stateService.getCurrentConfig())).toEqual([]);
+    });
+
+    it('throws with the message of a Google API error body', async () => {
+      spyOn(window, 'fetch').and.resolveTo(new Response(
+        JSON.stringify({
+          error: {code: 403, message: 'Permission denied', status: 'PERMISSION_DENIED'},
+        }),
+        {status: 403}
+      ));
+
+      await expectAsync(
+        service.fetchAgents(
+            'test-project', 'global', 'test-engine',
+            stateService.getCurrentConfig())
+      ).toBeRejectedWithError('Permission denied');
+    });
+
+    it('throws with the raw upstream text when the body is not an API error', async () => {
+      spyOn(window, 'fetch').and.resolveTo(
+        new Response('Service Unavailable', {status: 503})
+      );
+
+      await expectAsync(
+        service.fetchAgents(
+            'test-project', 'global', 'test-engine',
+            stateService.getCurrentConfig())
+      ).toBeRejectedWithError('Service Unavailable');
+    });
+
+    it('throws with the HTTP status when the error body is empty', async () => {
+      spyOn(window, 'fetch').and.resolveTo(new Response('', {status: 503}));
+
+      await expectAsync(
+        service.fetchAgents(
+            'test-project', 'global', 'test-engine',
+            stateService.getCurrentConfig())
+      ).toBeRejectedWithError('HTTP 503');
     });
   });
 });

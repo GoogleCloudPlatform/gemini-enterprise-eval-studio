@@ -18,6 +18,7 @@ import {HttpClient} from '@angular/common/http';
 import {Injectable} from '@angular/core';
 import {firstValueFrom} from 'rxjs';
 
+import {Agent, ListAgentsResponse} from '../models/agent.model';
 import {AppConfig, Engine, WidgetConfigResponse} from '../models/app-config.model';
 import {AssistRequest, EvalBackendService, ScoreRequest} from './eval-backend.service';
 
@@ -91,6 +92,19 @@ export class ProxyEvalBackendService extends EvalBackendService {
             encodeURIComponent(assistToken)}`;
     const res = await firstValueFrom(this.http.get<{traceId?: string}>(url));
     return res?.traceId;
+  }
+
+  override async fetchAgents(
+      projectId: string,
+      region: string,
+      engineId: string,
+      config: AppConfig
+  ): Promise<Agent[]> {
+    const url = `/api/v1/agents?projectId=${
+        encodeURIComponent(projectId)}&region=${
+        encodeURIComponent(region)}&engineId=${encodeURIComponent(engineId)}`;
+    const res = await firstValueFrom(this.http.get<ListAgentsResponse>(url));
+    return res?.agents || [];
   }
 }
 

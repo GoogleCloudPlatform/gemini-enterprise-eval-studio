@@ -16,12 +16,20 @@
 
 import {Injectable} from '@angular/core';
 
+import {Agent, ListAgentsResponse} from '../models/agent.model';
 import {AppConfig, Engine, WidgetConfigResponse} from '../models/app-config.model';
+import {apiErrorMessage} from './api-error';
 import {AssistRequest, EvalBackendService, ScoreRequest} from './eval-backend.service';
 import {StateService} from './state.service';
 
 /** The assistant every engine exposes, and the one the studio queries. */
 const DEFAULT_ASSISTANT_ID = 'default_assistant';
+
+/**
+ * The largest page size that ListAgents accepts. A single page is requested,
+ * which covers any realistic number of agents under one assistant.
+ */
+const MAX_AGENT_PAGE_SIZE = 1000;
 
 /**
  * Direct GCP implementation of EvalBackendService.
@@ -138,6 +146,35 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
     }
     const data = await response.json();
     return data.traces?.[0]?.traceId;
+  }
+
+  override async fetchAgents(
+      projectId: string,
+      region: string,
+      engineId: string,
+      config: AppConfig
+  ): Promise<Agent[]> {
+    const url = `https://${this.baseUrl(region)}/v1alpha/${
+        this.enginePath(projectId, region, engineId)}/assistants/${
+        DEFAULT_ASSISTANT_ID}/agents?pageSize=${MAX_AGENT_PAGE_SIZE}`;
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${config.gCloudToken}`,
+        'x-goog-user-project': projectId
+      }
+    });
+
+    if (!response.ok) {
+      // The caller adds its own context, so the message is just the reason.
+      const errorText = await response.text();
+      throw new Error(
+          apiErrorMessage(errorText) || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json() as ListAgentsResponse;
+    return data.agents || [];
   }
 
   /** The Discovery Engine host serving the given region. */

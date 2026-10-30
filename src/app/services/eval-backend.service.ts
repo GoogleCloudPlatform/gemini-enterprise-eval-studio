@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import {Agent} from '../models/agent.model';
 import {AppConfig, Engine, WidgetConfigResponse} from '../models/app-config.model';
 
 /**
@@ -53,5 +54,23 @@ export abstract class EvalBackendService {
       projectId: string,
       assistToken: string
   ): Promise<string | undefined>;
+
+  /**
+   * Lists the agents published under an engine's default assistant.
+   *
+   * @param projectId The Google Cloud project that owns the engine.
+   * @param region The engine's location, such as `global` or `eu`.
+   * @param engineId A bare engine ID or a full engine resource name.
+   * @param config The current app config, used for credentials.
+   * @return All agents the caller can see, whatever their state. Callers decide
+   *     which ones to offer.
+   * @throws If the agents cannot be listed.
+   */
+  abstract fetchAgents(
+      projectId: string,
+      region: string,
+      engineId: string,
+      config: AppConfig
+  ): Promise<Agent[]>;
 }
 
