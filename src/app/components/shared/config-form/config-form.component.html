@@ -125,6 +125,57 @@
             <option *ngFor="let m of models" [value]="m">{{ m }}</option>
           </select>
         </div>
+        <div *ngIf="config.selectedEngine">
+          <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+            ><span>Agent</span
+            ><app-info-tooltip
+              class="inline-flex"
+              text="The agent published under this engine that every query in the run is sent to. Leave on the default assistant to evaluate the engine itself."
+            ></app-info-tooltip
+          ></label>
+          <select
+            aria-label="Agent"
+            data-test-id="config-form-agent-select"
+            [(ngModel)]="config.selectedAgent"
+            (ngModelChange)="onConfigChange()"
+            class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            [disabled]="agentsLoading || agents.length === 0"
+          >
+            <option value="">Default assistant (no agent)</option>
+            <option *ngFor="let a of agents" [value]="a.name">{{ agentLabel(a) }}</option>
+          </select>
+          <div
+            *ngIf="agentsLoading"
+            data-test-id="config-form-agents-loading"
+            class="mt-1 flex items-center gap-2 text-xs text-gray-500"
+          >
+            <div
+              class="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"
+            ></div>
+            <span>Loading agents...</span>
+          </div>
+          <div
+            *ngIf="!agentsLoading && !agentsErrorMessage && agents.length === 0"
+            data-test-id="config-form-no-agents"
+            class="mt-1 text-xs text-gray-500"
+          >
+            No agents published under this engine.
+          </div>
+          <div
+            *ngIf="agentsErrorMessage"
+            data-test-id="config-form-agents-error"
+            class="mt-1 text-xs text-amber-700"
+          >
+            {{ agentsErrorMessage }} Queries will run against the default assistant.
+          </div>
+          <div
+            *ngIf="getSelectedAgent()?.description"
+            data-test-id="config-form-agent-description"
+            class="mt-1 text-xs text-gray-500"
+          >
+            {{ getSelectedAgent()?.description }}
+          </div>
+        </div>
         <div *ngIf="config.selectedEngine" #dropdownContainer class="relative">
           <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
             ><span>Connectors</span

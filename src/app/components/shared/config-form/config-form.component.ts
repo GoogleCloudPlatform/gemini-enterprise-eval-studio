@@ -21,9 +21,12 @@ import {FormsModule} from '@angular/forms';
 import {Subject} from 'rxjs';
 import {takeUntil} from 'rxjs/operators';
 
+import {Agent, agentDisplayName} from '../../../models/agent.model';
 import {AppConfig, CollectionComponent, DataStoreComponent, Engine, WidgetConfigResponse} from '../../../models/app-config.model';
 import {ScorerSelection} from '../../../scoring/scorer-selection';
 import {listAutoRaterModels} from '../../../scoring/scorers/auto-rater.scorer';
+import {AgentListService, AgentListState} from '../../../services/agent-list.service';
+import {apiErrorMessage} from '../../../services/api-error';
 import {AuthService} from '../../../services/auth.service';
 import {EvalBackendService} from '../../../services/eval-backend.service';
 import {StateService} from '../../../services/state.service';
@@ -102,6 +105,12 @@ const CONNECTOR_RULES: readonly ConnectorRule[] = [
 const DATA_SOURCE_DISPLAY_NAMES: Record<string, string> =
     Object.fromEntries(CONNECTOR_RULES.map(r => [r.dataSource, r.displayName]));
 
+/** Ends a message with a period unless it already ends a sentence. */
+function asSentence(message: string): string {
+  const trimmed = message.trim();
+  return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
 /**
  * Component for configuring evaluation settings.
  */
@@ -133,6 +142,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     region: 'global',
     selectedEngine: '',
     selectedModel: '',
+    selectedAgent: '',
     autoRaterModel: '',
     autoRaterInstruction: '',
     selectedDataStores: [],
@@ -151,6 +161,12 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   loading = false;
   errorMessage = '';
 
+  /**
+   * The agent list of the selected engine, shared with the settings form of
+   * the other tab through `AgentListService`.
+   */
+  private agentList: AgentListState = {status: 'idle', agents: []};
+
   isDropdownOpen = false;
   connectorSearchQuery = '';
   connectors: ConnectorOption[] = [];
@@ -161,7 +177,32 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
       readonly authService: AuthService,
       private readonly evalBackendService: EvalBackendService,
       private readonly scorerSelection: ScorerSelection,
+      private readonly agentListService: AgentListService,
   ) {}
+
+  /** The agents of the selected engine that can serve a query. */
+  get agents(): Agent[] {
+    return this.agentList.agents;
+  }
+
+  /** Whether the agent list of the selected engine is loading. */
+  get agentsLoading(): boolean {
+    return this.agentList.status === 'loading';
+  }
+
+  /**
+   * Why the agent list is empty when the cause is a failed lookup rather than
+   * an engine with no agents. It is shown beside the picker instead of in
+   * `errorMessage`, which belongs to the engine fetch, because an engine whose
+   * agents cannot be listed can still be evaluated with its default assistant.
+   */
+  get agentsErrorMessage(): string {
+    if (this.agentList.status !== 'failed') {
+      return '';
+    }
+    return asSentence(
+        `Could not list agents: ${this.describeError(this.agentList.error)}`);
+  }
 
   ngOnInit() {
     if (!this.authService.showCredentialInputs) {
@@ -179,6 +220,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
             this.updateModelsForSelectedEngine();
             if (engineChanged) {
               this.fetchConnectorsForSelectedEngine();
+              this.fetchAgentsForSelectedEngine();
             }
           }
           const autoRaterModelChanged = this.normalizeAutoRaterModel();
@@ -193,12 +235,22 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
           if (this.config.selectedEngine && this.engines.length > 0) {
             this.updateModelsForSelectedEngine();
             this.fetchConnectorsForSelectedEngine();
+            this.fetchAgentsForSelectedEngine();
           }
         });
 
     this.stateService.errorMessage$.pipe(takeUntil(this.destroy$))
         .subscribe((errorMessage: string) => {
           this.errorMessage = errorMessage;
+        });
+
+    this.agentListService.state$.pipe(takeUntil(this.destroy$))
+        .subscribe((agentList: AgentListState) => {
+          this.agentList = agentList;
+          if (agentList.status === 'loaded' || agentList.status === 'failed') {
+            this.dropUnofferedSelectedAgent();
+            this.cdr.detectChanges();
+          }
         });
   }
 
@@ -230,21 +282,17 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
               dataStoreIds: e.dataStoreIds
             }));
 
-            this.stateService.setEngines(this.engines);
-
-            if (this.config.selectedEngine) {
-              const exists = this.engines.some(
-                  e => e.name === this.config.selectedEngine);
-              if (exists) {
-                this.onEngineChange();
-              } else if (this.engines.length > 0) {
-                this.config.selectedEngine = this.engines[0].name;
-                this.onEngineChange();
-              }
-            } else if (this.engines.length > 0) {
+            const keepsEngine =
+                this.engines.some(e => e.name === this.config.selectedEngine);
+            if (!keepsEngine) {
               this.config.selectedEngine = this.engines[0].name;
-              this.onEngineChange();
             }
+            // Reloading the engines reloads their agents too. The selection is
+            // settled before the engines are published, so that every form
+            // asks for the same engine's agents and shares one request.
+            this.agentListService.clear();
+            this.onEngineChange(/* engineChanged= */ !keepsEngine);
+            this.stateService.setEngines(this.engines);
           } else {
             this.engines = [];
             this.stateService.setEngines([]);
@@ -268,7 +316,13 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   private describeError(error: unknown): string {
     const fallback = 'See console for details.';
     if (error instanceof HttpErrorResponse) {
-      return error.error?.error?.message || error.message || fallback;
+      // The proxy answers some failures with a plain-text body rather than a
+      // JSON error.
+      const body: unknown = error.error;
+      const bodyMessage = typeof body === 'string' ?
+          apiErrorMessage(body) :
+          (body as {error?: {message?: string}} | null)?.error?.message;
+      return bodyMessage || error.message || fallback;
     }
     if (error instanceof Error) {
       return error.message;
@@ -312,11 +366,70 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     }
   }
 
-  onEngineChange() {
+  /**
+   * Refreshes everything that depends on the selected engine.
+   *
+   * @param engineChanged Whether a different engine is now selected. False when
+   *     the engines were reloaded and still offer the selected one, in which
+   *     case the selected agent is kept.
+   */
+  onEngineChange(engineChanged = true) {
     this.config.selectedDataStores = [];
+    if (engineChanged) {
+      // Agents belong to a single engine, so a selection cannot survive a
+      // switch.
+      this.config.selectedAgent = '';
+    }
     this.updateModelsForSelectedEngine();
     this.fetchConnectorsForSelectedEngine();
+    this.fetchAgentsForSelectedEngine();
     this.onConfigChange();
+  }
+
+  /**
+   * Loads the runnable agents published under the selected engine into the
+   * picker. The list is shared with the other tab's form, so asking for a list
+   * that is already loading or loaded sends no request.
+   *
+   * A failure is reported beside the picker and leaves the run on the default
+   * assistant rather than blocking it: listing agents needs a permission that
+   * running queries does not, so an engine whose agents cannot be listed can
+   * still be evaluated.
+   */
+  fetchAgentsForSelectedEngine() {
+    this.agentListService.load(this.config);
+  }
+
+  /**
+   * Points the run back at the default assistant if the freshly loaded list no
+   * longer offers the selected agent, so a run never targets an agent that is
+   * gone or cannot answer.
+   *
+   * A selection the list still offers is kept. Both the Run Queries and the Run
+   * Evaluation forms load the list and share one config, so clearing it on
+   * every load would let one form silently undo a choice made in the other.
+   */
+  private dropUnofferedSelectedAgent() {
+    const selected = this.config.selectedAgent;
+    if (selected && !this.agents.some(a => a.name === selected)) {
+      this.config.selectedAgent = '';
+      this.onConfigChange();
+    }
+  }
+
+  /**
+   * The label shown for an agent in the picker. A suspended agent is marked,
+   * since the API describes it as temporarily unavailable and only its owners
+   * (and, in Enterprise edition, admins) can run it.
+   */
+  agentLabel(agent: Agent): string {
+    const name = agentDisplayName(agent);
+    return agent.state === 'SUSPENDED' ? `${name} (suspended)` : name;
+  }
+
+  /** The agent the run targets, or undefined for the default assistant. */
+  getSelectedAgent(): Agent|undefined {
+    return this.agents.find(a => a.name === this.config.selectedAgent);
   }
 
   fetchConnectorsForSelectedEngine() {
@@ -558,11 +671,13 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   changeConfigAndResetEngines() {
     this.config.selectedEngine = '';
     this.config.selectedModel = '';
+    this.config.selectedAgent = '';
     this.config.selectedDataStores = [];
     this.config.enableWebSearch = false;
     this.stateService.setConfig(this.config);
 
     this.engines = [];
+    this.agentListService.clear();
     this.stateService.setEngines([]);
     this.cdr.detectChanges();
   }

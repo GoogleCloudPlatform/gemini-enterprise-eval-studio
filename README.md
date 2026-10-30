@@ -60,6 +60,29 @@ the `golden` response:
 method is selected and its settings are complete. To add a scoring method, see
 [`src/app/scoring/README.md`](src/app/scoring/README.md).
 
+## Choosing an Agent
+
+By default, every query is sent to the selected engine's default assistant. To
+evaluate a custom agent instead, pick it from the **Agent** dropdown, which
+lists the agents published under the selected engine. Agents that were never
+deployed, are still being created or deployed, or failed to deploy are not
+listed, because they cannot answer queries. Suspended agents are listed and
+marked "(suspended)"; only their owners (and, in Enterprise edition, admins)
+can run them.
+
+-   Every query in a run goes to the same agent. Per-row agent selection is not
+    supported.
+-   The selection goes back to **Default assistant (no agent)** when the
+    engine changes, or when the agent list reloads and no longer offers the
+    selected agent. It is not saved between sessions.
+-   If the agents cannot be listed, for example because you lack permission to
+    list them, the reason is shown under the dropdown and the run uses the
+    default assistant.
+-   Settings are locked while a run is in progress, so every row uses the same
+    engine, model, connectors, and agent.
+-   The exported CSV has an **Agent ID** column holding the agent each row was
+    sent to. It is empty for rows that used the default assistant.
+
 ## Data Privacy and Governance
 
 To ensure security and compliance with enterprise data policies, Gemini

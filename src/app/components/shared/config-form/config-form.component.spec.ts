@@ -18,6 +18,7 @@ import {HttpErrorResponse} from '@angular/common/http';
 import {ComponentFixture, TestBed, fakeAsync, tick} from '@angular/core/testing';
 import {BehaviorSubject, of, throwError} from 'rxjs';
 
+import {Agent} from '../../../models/agent.model';
 import {AppConfig, Engine} from '../../../models/app-config.model';
 import {AuthService} from '../../../services/auth.service';
 import {EvalBackendService} from '../../../services/eval-backend.service';
@@ -124,6 +125,341 @@ describe('ConfigFormComponent', () => {
                               '[data-test-id="config-form-next-button"]')!;
          expect(next.matches(':disabled')).toBeFalse();
        });
+  });
+
+  describe('agents', () => {
+    const ENGINES: Engine[] = [
+      {name: 'engine1', displayName: 'Engine 1', modelConfigs: {}},
+      {name: 'engine2', displayName: 'Engine 2', modelConfigs: {}},
+    ];
+    const AGENT_1: Agent = {
+      name: 'engine1/assistants/default_assistant/agents/a1',
+      displayName: 'Support Bot',
+      description: 'Answers support questions.',
+      state: 'ENABLED',
+    };
+    const AGENT_2: Agent = {
+      name: 'engine1/assistants/default_assistant/agents/a2',
+      state: 'ENABLED',
+    };
+
+    function query<T extends Element>(testId: string): T|null {
+      return (fixture.nativeElement as HTMLElement)
+          .querySelector<T>(`[data-test-id="${testId}"]`);
+    }
+
+    function agentSelect(): HTMLSelectElement {
+      return query<HTMLSelectElement>('config-form-agent-select')!;
+    }
+
+    /** Shows the form for `engine1` of project `project`. */
+    function selectEngine1() {
+      component.config.projectId = 'project';
+      component.engines = ENGINES;
+      component.config.selectedEngine = 'engine1';
+    }
+
+    it('should offer the default assistant and every runnable agent',
+       fakeAsync(() => {
+         mockEvalBackendService.fetchAgentsSpy.and.resolveTo([
+           AGENT_1,
+           AGENT_2,
+           {name: 'engine1/assistants/default_assistant/agents/broken',
+            state: 'DEPLOYMENT_FAILED'},
+         ]);
+         selectEngine1();
+
+         component.onEngineChange();
+         tick();
+         fixture.detectChanges();
+
+         expect(mockEvalBackendService.fetchAgentsSpy)
+             .toHaveBeenCalledWith(
+                 'project', 'global', 'engine1',
+                 jasmine.objectContaining({selectedEngine: 'engine1'}));
+         const options = Array.from(agentSelect().options);
+         expect(options.map(o => o.textContent?.trim())).toEqual([
+           'Default assistant (no agent)', 'Support Bot', 'a2'
+         ]);
+         expect(agentSelect().disabled).toBeFalse();
+         expect(component.config.selectedAgent).toBe('');
+       }));
+
+    it('should mark a suspended agent in the picker', fakeAsync(() => {
+         mockEvalBackendService.fetchAgentsSpy.and.resolveTo(
+             [AGENT_1, {...AGENT_2, state: 'SUSPENDED'}]);
+         selectEngine1();
+
+         component.onEngineChange();
+         tick();
+         fixture.detectChanges();
+
+         const options = Array.from(agentSelect().options);
+         expect(options.map(o => o.textContent?.trim())).toEqual([
+           'Default assistant (no agent)', 'Support Bot', 'a2 (suspended)'
+         ]);
+       }));
+
+    it('should show the description of the selected agent', fakeAsync(() => {
+         mockEvalBackendService.fetchAgentsSpy.and.resolveTo([AGENT_1]);
+         selectEngine1();
+         component.onEngineChange();
+         tick();
+
+         component.config.selectedAgent = AGENT_1.name;
+         fixture.detectChanges();
+
+         expect(query('config-form-agent-description')?.textContent)
+             .toContain('Answers support questions.');
+       }));
+
+    it('should disable the picker and say so when the engine has no agents',
+       fakeAsync(() => {
+         mockEvalBackendService.fetchAgentsSpy.and.resolveTo([]);
+         selectEngine1();
+
+         component.onEngineChange();
+         tick();
+         fixture.detectChanges();
+         tick();
+
+         expect(agentSelect().disabled).toBeTrue();
+         expect(query('config-form-no-agents')?.textContent)
+             .toContain('No agents published under this engine.');
+       }));
+
+    it('should disable the picker while the agents are loading',
+       fakeAsync(() => {
+         mockEvalBackendService.fetchAgentsSpy.and.returnValue(
+             new Promise<Agent[]>(() => {}));
+         selectEngine1();
+
+         component.onEngineChange();
+         fixture.detectChanges();
+         tick();
+
+         expect(component.agentsLoading).toBeTrue();
+         expect(agentSelect().disabled).toBeTrue();
+         expect(query('config-form-agents-loading')).not.toBeNull();
+       }));
+
+    it('should fall back to the default assistant when agents cannot be listed',
+       fakeAsync(() => {
+         spyOn(console, 'error');
+         mockEvalBackendService.fetchAgentsSpy.and.rejectWith(
+             new Error('Permission denied'));
+         selectEngine1();
+
+         component.onEngineChange();
+         tick();
+         fixture.detectChanges();
+         tick();
+
+         expect(component.agents).toEqual([]);
+         expect(component.config.selectedAgent).toBe('');
+         expect(component.errorMessage).toBe('');
+         expect(query('config-form-agents-error')?.textContent)
+             .toContain(
+                 'Could not list agents: Permission denied. Queries will run against the default assistant.');
+       }));
+
+    it('should discard a response for an engine that is no longer selected',
+       fakeAsync(() => {
+         let resolveEngine1!: (agents: Agent[]) => void;
+         mockEvalBackendService.fetchAgentsSpy.and.callFake(
+             (projectId: string, region: string, engineId: string) =>
+                 engineId === 'engine1' ?
+                 new Promise<Agent[]>(resolve => {
+                   resolveEngine1 = resolve;
+                 }) :
+                 Promise.resolve([]));
+         selectEngine1();
+         component.onEngineChange();
+
+         component.config.selectedEngine = 'engine2';
+         component.onEngineChange();
+         tick();
+         resolveEngine1([AGENT_1]);
+         tick();
+
+         expect(component.agents).toEqual([]);
+         expect(component.agentsLoading).toBeFalse();
+       }));
+
+    it('should keep the selection when the reloaded list still offers it',
+       fakeAsync(() => {
+         mockEvalBackendService.fetchAgentsSpy.and.resolveTo(
+             [AGENT_1, AGENT_2]);
+         selectEngine1();
+         component.config.selectedAgent = AGENT_1.name;
+         mockStateService.setConfig.calls.reset();
+
+         component.fetchAgentsForSelectedEngine();
+         tick();
+
+         expect(component.config.selectedAgent).toBe(AGENT_1.name);
+         expect(mockStateService.setConfig).not.toHaveBeenCalled();
+       }));
+
+    it('should drop a selection the reloaded list no longer offers',
+       fakeAsync(() => {
+         mockEvalBackendService.fetchAgentsSpy.and.resolveTo([
+           AGENT_2,
+           {...AGENT_1, state: 'DEPLOYMENT_FAILED'},
+         ]);
+         selectEngine1();
+         component.config.selectedAgent = AGENT_1.name;
+
+         component.fetchAgentsForSelectedEngine();
+         tick();
+
+         expect(component.config.selectedAgent).toBe('');
+         expect(mockStateService.setConfig)
+             .toHaveBeenCalledWith(
+                 jasmine.objectContaining({selectedAgent: ''}));
+       }));
+
+    it('should share one request and one list between the two tabs\' forms',
+       fakeAsync(() => {
+         // Run Queries and Run Evaluation each mount a form, and both share
+         // the config through StateService.
+         mockStateService.setConfig.and.callFake(
+             (config: AppConfig) => configSubject.next(structuredClone(config)));
+         const resolvers: Array<(agents: Agent[]) => void> = [];
+         mockEvalBackendService.fetchAgentsSpy.and.callFake(
+             () => new Promise<Agent[]>(resolve => resolvers.push(resolve)));
+         const otherFixture = TestBed.createComponent(ConfigFormComponent);
+         otherFixture.detectChanges();
+         const otherForm = otherFixture.componentInstance;
+         enginesSubject.next(ENGINES);
+
+         // The user picks engine1 in this form; the other form follows.
+         selectEngine1();
+         component.onEngineChange();
+         expect(resolvers.length).toBe(1);
+
+         resolvers[0]([AGENT_1]);
+         tick();
+         expect(otherForm.agents).toEqual([AGENT_1]);
+
+         // An agent picked in this form survives in the other.
+         component.config.selectedAgent = AGENT_1.name;
+         component.onConfigChange();
+         otherForm.fetchAgentsForSelectedEngine();
+         tick();
+
+         expect(resolvers.length).toBe(1);
+         expect(configSubject.value.selectedAgent).toBe(AGENT_1.name);
+         expect(otherForm.config.selectedAgent).toBe(AGENT_1.name);
+       }));
+
+    it('should ignore an earlier response for the same engine', fakeAsync(() => {
+         const resolvers: Array<(agents: Agent[]) => void> = [];
+         mockEvalBackendService.fetchAgentsSpy.and.callFake(
+             () => new Promise<Agent[]>(resolve => resolvers.push(resolve)));
+         selectEngine1();
+
+         // engine1, engine2, then engine1 again before the first answer.
+         component.onEngineChange();
+         component.config.selectedEngine = 'engine2';
+         component.onEngineChange();
+         component.config.selectedEngine = 'engine1';
+         component.onEngineChange();
+         expect(resolvers.length).toBe(3);
+
+         resolvers[0]([AGENT_1]);
+         tick();
+         expect(component.agentsLoading).toBeTrue();
+         expect(component.agents).toEqual([]);
+
+         resolvers[2]([AGENT_2]);
+         tick();
+         expect(component.agentsLoading).toBeFalse();
+         expect(component.agents).toEqual([AGENT_2]);
+       }));
+
+    it('should show the proxy\'s plain-text error message', fakeAsync(() => {
+         spyOn(console, 'error');
+         mockEvalBackendService.fetchAgentsSpy.and.rejectWith(
+             new HttpErrorResponse({
+               status: 400,
+               statusText: 'Bad Request',
+               error: 'Invalid engineId parameter.',
+             }));
+         selectEngine1();
+
+         component.onEngineChange();
+         tick();
+
+         expect(component.agentsErrorMessage)
+             .toBe('Could not list agents: Invalid engineId parameter.');
+       }));
+
+    it('should keep the agent and send one request when reloaded engines keep the selected engine',
+       fakeAsync(() => {
+         mockEvalBackendService.fetchAgentsSpy.and.resolveTo([AGENT_1]);
+         mockEvalBackendService.fetchEnginesSpy.and.resolveTo(ENGINES);
+         // Publish the engines, so the engines$ subscription runs too.
+         mockStateService.setEngines.and.callFake(
+             (engines: Engine[]) => enginesSubject.next(engines));
+         selectEngine1();
+         component.onEngineChange();
+         tick();
+         component.config.selectedAgent = AGENT_1.name;
+         mockEvalBackendService.fetchAgentsSpy.calls.reset();
+
+         component.fetchEngines();
+         tick();
+
+         expect(mockEvalBackendService.fetchAgentsSpy.calls.count()).toBe(1);
+         expect(component.config.selectedAgent).toBe(AGENT_1.name);
+       }));
+
+    it('should clear the agents and the selection when the engine changes',
+       fakeAsync(() => {
+         mockEvalBackendService.fetchAgentsSpy.and.resolveTo([AGENT_1]);
+         selectEngine1();
+         component.onEngineChange();
+         tick();
+         component.config.selectedAgent = AGENT_1.name;
+         mockEvalBackendService.fetchAgentsSpy.and.returnValue(
+             new Promise<Agent[]>(() => {}));
+
+         component.config.selectedEngine = 'engine2';
+         component.onEngineChange();
+
+         expect(component.agents).toEqual([]);
+         expect(component.config.selectedAgent).toBe('');
+       }));
+
+    it('should clear the agents when the project, region or token changes',
+       fakeAsync(() => {
+         spyOn(console, 'error');
+         mockEvalBackendService.fetchAgentsSpy.and.rejectWith(
+             new Error('Permission denied'));
+         selectEngine1();
+         component.onEngineChange();
+         tick();
+         expect(component.agentsErrorMessage).not.toBe('');
+
+         component.changeConfigAndResetEngines();
+
+         expect(component.agents).toEqual([]);
+         expect(component.agentsErrorMessage).toBe('');
+         expect(component.agentsLoading).toBeFalse();
+         expect(component.config.selectedAgent).toBe('');
+       }));
+
+    it('should not look up agents without a project or engine', () => {
+      component.config.projectId = '';
+      component.config.selectedEngine = 'engine1';
+
+      component.fetchAgentsForSelectedEngine();
+
+      expect(mockEvalBackendService.fetchAgentsSpy).not.toHaveBeenCalled();
+      expect(component.agents).toEqual([]);
+      expect(component.agentsLoading).toBeFalse();
+    });
   });
 
   describe('fetchEngines', () => {
