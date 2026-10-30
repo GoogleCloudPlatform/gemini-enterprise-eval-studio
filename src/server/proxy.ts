@@ -24,6 +24,95 @@ import {RefreshTokenStore} from './store';
 const ENGINE_PATH_REGEX = /^projects\/([^/]+)\/locations\/([^/]+)\/collections\/([^/]+)\/engines\/([^/]+)$/;
 const REGION_REGEX = /^[a-z0-9-]+$/;
 
+/** A project ID, or a numeric project number. */
+const PROJECT_ID_REGEX = /^(?:[a-z][a-z0-9-]{4,28}[a-z0-9]|[0-9]+)$/;
+
+/** A single resource ID segment, such as an engine or collection ID. */
+const RESOURCE_ID_REGEX = /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+/**
+ * A full engine resource name whose segments contain no characters that could
+ * change the meaning of a URL (no `.`, `?`, `#`, `%` or extra `/`).
+ */
+const STRICT_ENGINE_PATH_REGEX =
+    /^projects\/[a-z0-9-]+\/locations\/([a-z0-9-]+)\/collections\/[a-zA-Z0-9][a-zA-Z0-9_-]*\/engines\/[a-zA-Z0-9][a-zA-Z0-9_-]*$/;
+
+/** The largest page size that ListAgents accepts. */
+const MAX_AGENT_PAGE_SIZE = 1000;
+
+/**
+ * Expands an `engineId` query parameter into a full engine resource name.
+ *
+ * The client sends either a full `projects/.../engines/{id}` resource name or
+ * a bare engine ID. Both are validated, not just normalized, because the result
+ * is interpolated into an upstream request URL and an unvetted value could
+ * address a resource other than the one named.
+ *
+ * A full resource name must be in `region`, since the request is sent to that
+ * region's endpoint. Its project is not compared with `projectId`: engine
+ * names carry the project number, while `projectId` is usually the project ID.
+ *
+ * @param projectId The validated project ID, used to expand a bare engine ID.
+ * @param region The validated region. A bare engine ID is expanded into it,
+ *     and a full resource name must name it.
+ * @param engineId A full engine resource name or a bare engine ID.
+ * @return The engine resource name, or null if `engineId` is not a valid
+ *     engine reference in `region`.
+ */
+export function resolveEnginePath(
+    projectId: string, region: string, engineId: string): string|null {
+  if (engineId.startsWith('projects/')) {
+    const match = STRICT_ENGINE_PATH_REGEX.exec(engineId);
+    return match && match[1] === region ? engineId : null;
+  }
+  if (!RESOURCE_ID_REGEX.test(engineId)) {
+    return null;
+  }
+  return `projects/${projectId}/locations/${region}/collections/default_collection/engines/${engineId}`;
+}
+
+/** The validated engine a request addresses. */
+export interface EngineQuery {
+  projectId: string;
+  region: string;
+  /** The full engine resource name, safe to interpolate into a URL. */
+  enginePath: string;
+}
+
+/**
+ * Whether a query parameter was given exactly once and matches `pattern`. A
+ * parameter given more than once arrives as an array, which is rejected.
+ */
+function isValidParam(value: unknown, pattern: RegExp): value is string {
+  return typeof value === 'string' && pattern.test(value);
+}
+
+/**
+ * Validates the `projectId`, `region` and `engineId` query parameters of a
+ * request that addresses one engine.
+ *
+ * @param query The request's query parameters.
+ * @return The validated engine, or the reason the request is invalid, suitable
+ *     for a 400 response.
+ */
+export function parseEngineQuery(query: Request['query']): EngineQuery|
+    {error: string} {
+  const {projectId, region, engineId} = query ?? {};
+  if (!isValidParam(projectId, PROJECT_ID_REGEX)) {
+    return {error: 'Invalid or missing projectId parameter.'};
+  }
+  if (!isValidParam(region, REGION_REGEX)) {
+    return {error: 'Invalid or missing region parameter.'};
+  }
+  const enginePath = typeof engineId === 'string' ?
+      resolveEnginePath(projectId, region, engineId) :
+      null;
+  if (!enginePath) {
+    return {error: 'Invalid or missing engineId parameter.'};
+  }
+  return {projectId, region, enginePath};
+}
+
 /**
  * Creates the Express router for proxying requests to Discovery Engine and Vertex AI.
  */
@@ -260,6 +349,51 @@ export function createProxyRouter(config: Config, refreshTokenStore?: RefreshTok
           : 500;
       const message = err instanceof Error ? err.message : String(err);
       res.status(status).send(`Proxy request failed: ${message}`);
+    }
+  });
+
+  // 6. GET /api/v1/agents (Discovery Engine list agents proxy)
+  //
+  // This uses a raw fetch rather than the generated `googleapis` client,
+  // because the pinned client does not expose the
+  // `engines.assistants.agents` resource.
+  router.get('/api/v1/agents', async (req: Request, res: Response) => {
+    const engine = parseEngineQuery(req.query);
+    if ('error' in engine) {
+      res.status(400).send(engine.error);
+      return;
+    }
+    const {projectId, region, enginePath} = engine;
+
+    const accessToken = req.session?.token?.access_token;
+    if (!accessToken) {
+      res.status(401).send('Not authenticated.');
+      return;
+    }
+
+    const baseUrl = region === 'global'
+      ? 'discoveryengine.googleapis.com'
+      : `${region}-discoveryengine.googleapis.com`;
+    const url = `https://${baseUrl}/v1alpha/${enginePath}/assistants/default_assistant/agents?pageSize=${MAX_AGENT_PAGE_SIZE}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'x-goog-user-project': projectId,
+        },
+      });
+
+      if (!response.ok) {
+        res.status(response.status).send(await response.text());
+        return;
+      }
+
+      res.json(await response.json());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      res.status(500).send(`Proxy request failed: ${message}`);
     }
   });
 
