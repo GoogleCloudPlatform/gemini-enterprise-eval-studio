@@ -252,17 +252,25 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
           this.stateService.setEngines([]);
           
           console.error('Error fetching engines:', error);
-          let details = 'See console for details.';
-          if (error instanceof HttpErrorResponse) {
-            details = error.error?.error?.message || error.message || details;
-          } else if (error instanceof Error) {
-            details = error.message;
-          } else if (typeof error === 'string') {
-            details = error;
-          }
-          this.errorMessage = `Error fetching engines: ${details}`;
+          this.errorMessage =
+              `Error fetching engines: ${this.describeError(error)}`;
           this.cdr.detectChanges();
         });
+  }
+
+  /** Reduces a caught error to the message worth showing the user. */
+  private describeError(error: unknown): string {
+    const fallback = 'See console for details.';
+    if (error instanceof HttpErrorResponse) {
+      return error.error?.error?.message || error.message || fallback;
+    }
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    return fallback;
   }
 
   /** Populates models list based on selected engine, without resetting selectedModel if it's valid. */

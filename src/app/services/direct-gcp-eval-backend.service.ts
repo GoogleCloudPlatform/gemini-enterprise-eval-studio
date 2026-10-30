@@ -20,6 +20,9 @@ import {AppConfig, Engine, WidgetConfigResponse} from '../models/app-config.mode
 import {AssistRequest, EvalBackendService, ScoreRequest} from './eval-backend.service';
 import {StateService} from './state.service';
 
+/** The assistant every engine exposes, and the one the studio queries. */
+const DEFAULT_ASSISTANT_ID = 'default_assistant';
+
 /**
  * Direct GCP implementation of EvalBackendService.
  * Used in no-auth mode to make direct calls to GCP APIs from the browser.
@@ -33,11 +36,8 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
 
   override async callAssist(request: AssistRequest): Promise<Response> {
     const {selectedEngine, region, body} = request;
-    const baseUrl = region === 'global'
-      ? 'discoveryengine.googleapis.com'
-      : `${region}-discoveryengine.googleapis.com`;
-
-    const url = `https://${baseUrl}/v1/${selectedEngine}/assistants/default_assistant:streamAssist`;
+    const url = `https://${this.baseUrl(region)}/v1/${
+        selectedEngine}/assistants/${DEFAULT_ASSISTANT_ID}:streamAssist`;
 
     return fetch(url, {
       method: 'POST',
@@ -65,11 +65,7 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
   }
 
   override async fetchEngines(projectId: string, region: string, config: AppConfig): Promise<Engine[]> {
-    const baseUrl = region === 'global'
-      ? 'discoveryengine.googleapis.com'
-      : `${region}-discoveryengine.googleapis.com`;
-
-    const url = `https://${baseUrl}/v1alpha/projects/${projectId}/locations/${region}/collections/default_collection/engines`;
+    const url = `https://${this.baseUrl(region)}/v1alpha/projects/${projectId}/locations/${region}/collections/default_collection/engines`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -97,14 +93,8 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
     if (!config.gCloudToken || !projectId || !engineId) {
       return null;
     }
-    const baseUrl = region === 'global'
-      ? 'discoveryengine.googleapis.com'
-      : `${region}-discoveryengine.googleapis.com`;
-
-    const enginePath = engineId.startsWith('projects/')
-      ? engineId
-      : `projects/${projectId}/locations/${region}/collections/default_collection/engines/${engineId}`;
-    const url = `https://${baseUrl}/v1alpha/${enginePath}/widgetConfigs/default_search_widget_config`;
+    const url = `https://${this.baseUrl(region)}/v1alpha/${
+        this.enginePath(projectId, region, engineId)}/widgetConfigs/default_search_widget_config`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -148,6 +138,23 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
     }
     const data = await response.json();
     return data.traces?.[0]?.traceId;
+  }
+
+  /** The Discovery Engine host serving the given region. */
+  private baseUrl(region: string): string {
+    return region === 'global'
+      ? 'discoveryengine.googleapis.com'
+      : `${region}-discoveryengine.googleapis.com`;
+  }
+
+  /**
+   * The engine resource name for a full `projects/.../engines/{id}` path or a
+   * bare engine id, which is assumed to live in the default collection.
+   */
+  private enginePath(projectId: string, region: string, engineId: string): string {
+    return engineId.startsWith('projects/')
+      ? engineId
+      : `projects/${projectId}/locations/${region}/collections/default_collection/engines/${engineId}`;
   }
 
   private getGCloudToken(): string {
