@@ -157,6 +157,7 @@ export class RunQueriesComponent {
         projectId: result.projectId,
         region: result.region,
         engineId: result.engineId,
+        agentId: result.agentId,
         traceId: result.traceId,
         traceUrl: result.traceUrl
       };

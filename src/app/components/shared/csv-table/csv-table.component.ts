@@ -87,6 +87,9 @@ export class CsvTableComponent implements OnChanges {
       if ('engineId' in row) {
         exportedRow['Engine ID'] = row.engineId || '';
       }
+      if ('agentId' in row) {
+        exportedRow['Agent ID'] = row.agentId || '';
+      }
       if ('assistToken' in row) {
         exportedRow['Assist Token'] = row.assistToken || '';
       }

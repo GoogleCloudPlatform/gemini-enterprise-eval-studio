@@ -366,6 +366,54 @@ describe('EvalService', () => {
          expect(result.engineId).toBe('current');
        });
 
+    describe('agent routing', () => {
+      const AGENT_NAME =
+          'projects/project/locations/global/collections/default_collection/engines/engine/assistants/default_assistant/agents/support-bot';
+
+      it('should omit agentsSpec and record no agent when none is selected',
+         async () => {
+           mockBackendService.callAssistSpy.and.returnValue(fetched('hi'));
+
+           const result = await service.processRow(
+               {query: 'q', golden: ''}, undefined, undefined,
+               {...config, selectedAgent: ''});
+
+           const request =
+               mockBackendService.callAssistSpy.calls.mostRecent().args[0];
+           expect(request.body.agentsSpec).toBeUndefined();
+           expect(result.agentId).toBe('');
+         });
+
+      it('should send the bare agent ID and record it when an agent is selected',
+         async () => {
+           mockBackendService.callAssistSpy.and.returnValue(fetched('hi'));
+
+           const result = await service.processRow(
+               {query: 'q', golden: ''}, undefined, undefined,
+               {...config, selectedAgent: AGENT_NAME});
+
+           const request =
+               mockBackendService.callAssistSpy.calls.mostRecent().args[0];
+           expect(request.body.agentsSpec)
+               .toEqual({agentSpecs: [{agentId: 'support-bot'}]});
+           expect(request.selectedEngine).toBe(config.selectedEngine);
+           expect(result.agentId).toBe('support-bot');
+         });
+
+      it('should record the agent ID on a row whose request failed',
+         async () => {
+           mockBackendService.callAssistSpy.and.resolveTo(
+               new Response('Internal error', {status: 500}));
+
+           const result = await service.processRow(
+               {query: 'q', golden: ''}, undefined, undefined,
+               {...config, selectedAgent: AGENT_NAME});
+
+           expect(result.fetched).toContain('Error:');
+           expect(result.agentId).toBe('support-bot');
+         });
+    });
+
     it('should collect the thinking trace one thought per line, keeping it out of the fetched answer',
        async () => {
          mockBackendService.callAssistSpy.and.returnValue(streamed(

@@ -16,6 +16,7 @@
 
 import {Injectable} from '@angular/core';
 
+import {agentIdFromResourceName} from '../models/agent.model';
 import {AppConfig} from '../models/app-config.model';
 import {CSVRow} from '../models/csv-row.model';
 import {ResultRow} from '../models/result-row.model';
@@ -51,6 +52,8 @@ interface AssistRequestBody {
     };
     webGroundingSpec?: {};
   };
+  /** Routes the query to a published agent instead of the default assistant. */
+  agentsSpec?: {agentSpecs: Array<{agentId: string}>};
 }
 
 /**
@@ -116,6 +119,14 @@ export class EvalService {
 
     if (config.selectedModel !== 'auto') {
       body.generationSpec = {modelId: config.selectedModel};
+    }
+
+    // streamAssist takes the bare agent ID, while the config holds the full
+    // resource name. With no agent selected, agentsSpec is omitted so the query
+    // goes to the default assistant.
+    const agentId = agentIdFromResourceName(config.selectedAgent);
+    if (agentId) {
+      body.agentsSpec = {agentSpecs: [{agentId}]};
     }
 
     const projectId = config.projectId.trim();
@@ -271,6 +282,7 @@ export class EvalService {
         projectId,
         region,
         engineId,
+        agentId,
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
         traceId,
@@ -295,6 +307,7 @@ export class EvalService {
         projectId,
         region,
         engineId,
+        agentId,
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
         traceId,
