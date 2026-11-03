@@ -57,8 +57,9 @@ export interface ScorerRunResult {
   /** The scorer's error message, when it threw. */
   error?: string;
   /**
-   * Whether the scorer was skipped because it requires a golden answer and
-   * the row has none.
+   * Whether the scorer was skipped (because it requires a golden answer and
+   * the row has none, or because the row itself is not scorable during
+   * re-rating).
    */
   skipped?: boolean;
 }

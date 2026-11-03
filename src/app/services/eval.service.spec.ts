@@ -973,18 +973,27 @@ describe('EvalService', () => {
           .toBeRejectedWithError('Project ID is required.');
     });
 
-    it('should set an empty errorCode on a successful response', async () => {
-      mockBackendService.callAssistSpy.and.returnValue(fetched('Success'));
-      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
-
-      const result = await service.processRow({query: 'q', golden: 'g'});
-
-      expect(result.errorCode).toBe('');
-      expect(result.fetched).toBe('Success');
-    });
-
-    it('should set errorCode to SKIPPED and format fetched when response state is SKIPPED',
+    it('should set an empty errorCode and report fetch and score progress on a successful response',
        async () => {
+         mockBackendService.callAssistSpy.and.returnValue(fetched('Success'));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+         const progressSteps: Array<'fetch'|'score'> = [];
+
+         const result = await service.processRow(
+             {query: 'q', golden: 'g'}, step => progressSteps.push(step));
+
+         expect(result.errorCode).toBe('');
+         expect(result.fetched).toBe('Success');
+         expect(progressSteps).toEqual(['fetch', 'score']);
+       });
+
+    it('should set errorCode to SKIPPED, format fetched, and skip scoring when response state is SKIPPED',
+       async () => {
+         const warnSpy = spyOn(console, 'warn');
+         const scorer = new FakeScorer(
+             AUTO_RATER_SCORER_ID, 'Auto Rater', async () => ({score: 0.9}));
+         const service = setUp([scorer]);
          mockBackendService.callAssistSpy.and.resolveTo(
              new Response(JSON.stringify([{
                answer: {
@@ -994,16 +1003,28 @@ describe('EvalService', () => {
              }])));
          spyOn(service['stateService'], 'getCurrentConfig')
              .and.returnValue(config);
+         const progressSteps: Array<'fetch'|'score'> = [];
 
-         const result = await service.processRow({query: 'Hi', golden: 'g'});
+         const result = await service.processRow(
+             {query: 'Hi', golden: 'g'}, step => progressSteps.push(step));
 
          expect(result.errorCode).toBe('SKIPPED');
          expect(result.fetched)
              .toBe('SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED');
+         expect(result.scorerResults).toEqual([]);
+         expect(scorer.requests).toEqual([]);
+         expect(progressSteps).toEqual(['fetch']);
+         expect(warnSpy).toHaveBeenCalledWith(
+             jasmine.any(String),
+             jasmine.objectContaining({errorCode: 'SKIPPED'}));
        });
 
-    it('should set errorCode to FAILED and format fetched when response state is FAILED',
+    it('should set errorCode to FAILED, format fetched, and skip scoring when response state is FAILED',
        async () => {
+         const warnSpy = spyOn(console, 'warn');
+         const scorer = new FakeScorer(
+             AUTO_RATER_SCORER_ID, 'Auto Rater', async () => ({score: 0.9}));
+         const service = setUp([scorer]);
          mockBackendService.callAssistSpy.and.resolveTo(
              new Response(JSON.stringify([{
                answer: {
@@ -1012,11 +1033,19 @@ describe('EvalService', () => {
              }])));
          spyOn(service['stateService'], 'getCurrentConfig')
              .and.returnValue(config);
+         const progressSteps: Array<'fetch'|'score'> = [];
 
-         const result = await service.processRow({query: 'q', golden: 'g'});
+         const result = await service.processRow(
+             {query: 'q', golden: 'g'}, step => progressSteps.push(step));
 
          expect(result.errorCode).toBe('FAILED');
          expect(result.fetched).toBe('FAILED: Assist operation failed.');
+         expect(result.scorerResults).toEqual([]);
+         expect(scorer.requests).toEqual([]);
+         expect(progressSteps).toEqual(['fetch']);
+         expect(warnSpy).toHaveBeenCalledWith(
+             jasmine.any(String),
+             jasmine.objectContaining({errorCode: 'FAILED'}));
        });
 
     it('should set errorCode to RATE_LIMITED and format fetched without double Error prefix on 429',

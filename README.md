@@ -46,10 +46,12 @@ For **Run Evaluation**, your input CSV must include `query` and `golden` columns
 
 ## Scoring
 
-Each evaluated row is scored between `0.0` and `1.0` using the method set up
-in the **Scoring Setup** card of the configuration step. The **Auto Rater (LLM
-as a judge)** method asks a Gemini model to rate the fetched response against
-the `golden` response:
+Each evaluated row without an error (`SKIPPED`, `FAILED`, `ERROR`,
+`INVALID_TURN_ID`, or `SESSION_FAILED`) is scored between `0.0` and `1.0` using
+the method set up in the **Scoring Setup** card of the configuration step; rows
+with an error code (or missing a required `golden` response) are skipped and
+leave their score cells blank. The **Auto Rater (LLM as a judge)** method asks a
+Gemini model to rate the fetched response against the `golden` response:
 
 | Setting | Description |
 | :--- | :--- |

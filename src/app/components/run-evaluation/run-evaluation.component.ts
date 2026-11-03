@@ -21,7 +21,7 @@ import {distinctUntilChanged, map, takeUntil} from 'rxjs/operators';
 
 import {AppConfig} from '../../models/app-config.model';
 import {CSVRow} from '../../models/csv-row.model';
-import {ResultRow, TRACE_COLUMN_TOOLTIP} from '../../models/result-row.model';
+import {ResultRow, TRACE_COLUMN_TOOLTIP, isScorableRow} from '../../models/result-row.model';
 import {scoreColumnHeader, scoreErrorColumnHeader} from '../../scoring/score-columns';
 import {Scorer, ScorerRunResult, firstScorerError} from '../../scoring/scorer';
 import {ScorerRegistry} from '../../scoring/scorer.registry';
@@ -208,7 +208,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       const flat: Record<string, unknown> = {...rest};
       for (const {id} of this.scorerColumns) {
         const result = scorerResults.find(r => r.scorerId === id);
-        flat[scoreKey(id)] = result ? result.score : '';
+        flat[scoreKey(id)] = result && !result.skipped ? result.score : '';
         flat[scoreErrorKey(id)] = result?.error ?? '';
       }
       return flat;
@@ -492,22 +492,28 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       this.progress = Math.round((i / this.totalRows) * 100);
       this.cdr.detectChanges();
 
-      // Every scorer runs, one after another, so an unfetched row still gets
-      // an entry per scorer and the score columns stay aligned.
-      // TODO(b/577900526): Skip scoring rows with failure errorCode during re-rate.
-      const scorerResults: ScorerRunResult[] = row.fetched ?
-          await this.evalService.scoreAll({
-            query: row.query,
-            response: row.fetched,
-            golden: row.golden,
-            config
-          }) :
-          scorers.map(scorer => ({
-                        scorerId: scorer.id,
-                        displayName: scorer.displayName,
-                        score: 0,
-                        skipped: true
-                      }));
+      // Only rows with no errorCode are scored; the rest get a skipped entry
+      // per scorer.
+      let scorerResults: ScorerRunResult[];
+      if (isScorableRow(row.errorCode)) {
+        scorerResults = await this.evalService.scoreAll({
+          query: row.query,
+          response: row.fetched,
+          golden: row.golden,
+          config
+        });
+      } else {
+        console.warn('Skipping re-rate scoring for row:', {
+          rowIndex: i + 1,
+          errorCode: row.errorCode,
+        });
+        scorerResults = scorers.map(scorer => ({
+                                      scorerId: scorer.id,
+                                      displayName: scorer.displayName,
+                                      score: 0,
+                                      skipped: true
+                                    }));
+      }
 
       if (!this.isProcessing) {
         for (let j = i; j < this.results.length; j++) {

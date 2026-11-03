@@ -1,8 +1,11 @@
 # Scoring
 
-Every evaluated row is scored by a **scorer**: a strategy that turns a query,
-the agent's response and (optionally) a golden answer into a normalized score
-between `0.0` and `1.0`.
+Every evaluated row without an `errorCode` is scored by a **scorer**: a strategy
+that turns a query, the agent's response and (optionally) a golden answer into a
+normalized score between `0.0` and `1.0`. Rows with a non-empty `errorCode`
+(`SKIPPED`, `FAILED`, `ERROR`, `INVALID_TURN_ID`, or `SESSION_FAILED`) are not
+scored, and their score cells are left blank in the results table and CSV export
+(as are entries skipped by a scorer when a required `golden` answer is missing).
 
 | File | Role |
 | --- | --- |

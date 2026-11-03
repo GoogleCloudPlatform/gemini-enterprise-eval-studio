@@ -950,6 +950,22 @@ describe('RunEvaluationComponent', () => {
           .toEqual(Object.keys(component.displayResults[1]));
       expect(component.displayResults[1]['score_second']).toBe('');
     });
+
+    it('should display 0 for a genuine zero score and blank for a skipped scorer entry',
+       () => {
+         select('first', 'second');
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         resultsSubject.next([rowWith([
+           {scorerId: 'first', displayName: 'First', score: 0},
+           {scorerId: 'second', displayName: 'Second', score: 0, skipped: true},
+         ])]);
+
+         expect(component.displayResults[0]['score_first']).toBe(0);
+         expect(component.displayResults[0]['score_second']).toBe('');
+       });
   });
 
   describe('startReRate', () => {
@@ -1065,6 +1081,7 @@ describe('RunEvaluationComponent', () => {
            query: 'q1',
            golden: 'g1',
            fetched: '',
+           errorCode: 'ERROR',
            ttft: 0,
            ttfa: 0,
            ttlt: 0,
@@ -1077,6 +1094,114 @@ describe('RunEvaluationComponent', () => {
 
          expect(mockEvalService.scoreAll).not.toHaveBeenCalled();
          expect(resultsSubject.value[0].scorerResults?.[0].skipped).toBeTrue();
+       }));
+
+    it('should skip scoring rows with a non-empty errorCode during re-rate',
+       fakeAsync(() => {
+         const warnSpy = spyOn(console, 'warn');
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         resultsSubject.next([
+           {
+             query: 'q-skipped',
+             golden: 'g',
+             fetched: 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+             errorCode: 'SKIPPED',
+             ttft: 0,
+             ttfa: 0,
+             ttlt: 1,
+             scorerResults: [],
+           },
+           {
+             query: 'q-failed',
+             golden: 'g',
+             fetched: 'FAILED: Assist operation failed.',
+             errorCode: 'FAILED',
+             ttft: 0,
+             ttfa: 0,
+             ttlt: 1,
+             scorerResults: [],
+           },
+           {
+             query: 'q-rate-limited',
+             golden: 'g',
+             fetched: 'Error: Rate limited: Quota exceeded',
+             errorCode: 'RATE_LIMITED',
+             ttft: 0,
+             ttfa: 0,
+             ttlt: 0,
+             scorerResults: [],
+           },
+           {
+             query: 'q-http',
+             golden: 'g',
+             fetched: 'Error: HTTP error! status: 500 Internal Server Error',
+             errorCode: 'HTTP_500',
+             ttft: 0,
+             ttfa: 0,
+             ttlt: 0,
+             scorerResults: [],
+           },
+           {
+             query: 'q-invalid-turn',
+             golden: 'g',
+             fetched: 'INVALID_TURN_ID: Incorrect or missing turn ID.',
+             errorCode: 'INVALID_TURN_ID',
+             ttft: 0,
+             ttfa: 0,
+             ttlt: 0,
+             scorerResults: [],
+           },
+           {
+             query: 'q-error',
+             golden: 'g',
+             fetched: 'Error: Network connection lost',
+             errorCode: 'ERROR',
+             ttft: 0,
+             ttfa: 0,
+             ttlt: 0,
+             scorerResults: [],
+           },
+           {
+             query: 'q-valid',
+             golden: 'g',
+             fetched: 'Valid response',
+             errorCode: '',
+             ttft: 1,
+             ttfa: 2,
+             ttlt: 3,
+             scorerResults: scored(0.5),
+           },
+         ]);
+         mockEvalService.scoreAll.and.resolveTo(scored(0.9));
+
+         component.openReRateModal();
+         component.startReRate();
+         tick();
+
+         expect(mockEvalService.scoreAll).toHaveBeenCalledTimes(1);
+         expect(mockEvalService.scoreAll)
+             .toHaveBeenCalledWith(jasmine.objectContaining({
+               query: 'q-valid',
+               response: 'Valid response',
+             }));
+         expect(warnSpy).toHaveBeenCalledWith(
+             jasmine.any(String),
+             jasmine.objectContaining({errorCode: 'SKIPPED'}));
+         expect(warnSpy).toHaveBeenCalledWith(
+             jasmine.any(String),
+             jasmine.objectContaining({errorCode: 'FAILED'}));
+
+         const skipped: ScorerRunResult[] = [
+           {scorerId: 'first', displayName: 'First', score: 0, skipped: true},
+         ];
+         expect(resultsSubject.value.map(row => row.scorerResults)).toEqual([
+           skipped, skipped, skipped, skipped, skipped, skipped, scored(0.9),
+         ]);
+         expect(component.displayResults.map(row => row['score_first']))
+             .toEqual(['', '', '', '', '', '', 0.9]);
        }));
 
     it('should do nothing while another run is in progress', fakeAsync(() => {

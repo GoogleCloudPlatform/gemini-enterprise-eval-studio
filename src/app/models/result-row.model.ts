@@ -35,6 +35,16 @@ export type ResultErrorCode =
     |'ERROR';
 
 /**
+ * Returns whether a result row should be scored.
+ * Rows with any non-empty `errorCode` (including `'SKIPPED'` and `'FAILED'`)
+ * are not scored.
+ */
+export function isScorableRow(
+    errorCode: ResultErrorCode|undefined): boolean {
+  return !errorCode;
+}
+
+/**
  * Represents a row in the evaluation results.
  */
 export interface ResultRow {
@@ -56,7 +66,7 @@ export interface ResultRow {
   ttlt: number;
   /**
    * One entry per scorer that ran, in run order, carrying each scorer's score
-   * and error. Empty when the response could not be fetched.
+   * and error. Empty when the row was not scored (see `isScorableRow`).
    */
   scorerResults: ScorerRunResult[];
   assistToken?: string;

@@ -19,7 +19,7 @@ import {Injectable} from '@angular/core';
 import {agentIdFromResourceName} from '../models/agent.model';
 import {AppConfig} from '../models/app-config.model';
 import {CSVRow} from '../models/csv-row.model';
-import {ResultErrorCode, ResultRow} from '../models/result-row.model';
+import {ResultErrorCode, ResultRow, isScorableRow} from '../models/result-row.model';
 import {ScorerRunResult, ScoringRequest} from '../scoring/scorer';
 import {ScorerRegistry} from '../scoring/scorer.registry';
 
@@ -288,14 +288,22 @@ export class EvalService {
           this.resolveTraceId(projectId, assistToken) :
           Promise.resolve(traceId);
 
-      onProgress?.('score');
-      // TODO(b/577900526): Skip scoring when errorCode === 'FAILED'.
-      const scorerResults = await this.scoreAll({
-        query: row.query,
-        response: streamState.fullText,
-        golden: row.golden,
-        config
-      });
+      let scorerResults: ScorerRunResult[] = [];
+      if (isScorableRow(errorCode)) {
+        onProgress?.('score');
+        scorerResults = await this.scoreAll({
+          query: row.query,
+          response: streamState.fullText,
+          golden: row.golden,
+          config
+        });
+      } else {
+        console.warn('Skipping scoring for row:', {
+          errorCode,
+          conversationId: row.conversationId,
+          turn: row.turn,
+        });
+      }
 
       traceId = await traceIdPromise;
 
