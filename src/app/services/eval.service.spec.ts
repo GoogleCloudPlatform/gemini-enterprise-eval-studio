@@ -972,6 +972,167 @@ describe('EvalService', () => {
           service.processRow({query: 'my query', golden: 'my golden'}))
           .toBeRejectedWithError('Project ID is required.');
     });
+
+    it('should set an empty errorCode on a successful response', async () => {
+      mockBackendService.callAssistSpy.and.returnValue(fetched('Success'));
+      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
+
+      const result = await service.processRow({query: 'q', golden: 'g'});
+
+      expect(result.errorCode).toBe('');
+      expect(result.fetched).toBe('Success');
+    });
+
+    it('should set errorCode to SKIPPED and format fetched when response state is SKIPPED',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([{
+               answer: {
+                 state: 'SKIPPED',
+                 assistSkippedReasons: ['NON_ASSIST_SEEKING_QUERY_IGNORED'],
+               },
+             }])));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'Hi', golden: 'g'});
+
+         expect(result.errorCode).toBe('SKIPPED');
+         expect(result.fetched)
+             .toBe('SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED');
+       });
+
+    it('should set errorCode to FAILED and format fetched when response state is FAILED',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([{
+               answer: {
+                 state: 'FAILED',
+               },
+             }])));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.errorCode).toBe('FAILED');
+         expect(result.fetched).toBe('FAILED: Assist operation failed.');
+       });
+
+    it('should set errorCode to RATE_LIMITED and format fetched without double Error prefix on 429',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(new Response(
+             JSON.stringify({
+               details: [{
+                 assistToken: 'rate-limited-token',
+                 reason: 'Quota exceeded',
+               }],
+             }),
+             {status: 429}));
+         mockBackendService.fetchTraceIdSpy.and.resolveTo(undefined);
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.errorCode).toBe('RATE_LIMITED');
+         expect(result.fetched).toBe('Error: Rate limited: Quota exceeded');
+       });
+
+    it('should fall back to error.message or default reason when 429 body is standard GCP error or non-JSON',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(new Response(
+             JSON.stringify([{
+               error: {
+                 code: 429,
+                 message: 'Quota exceeded for quota metric Assist requests.',
+                 status: 'RESOURCE_EXHAUSTED',
+               },
+             }]),
+             {status: 429}));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const jsonResult =
+             await service.processRow({query: 'q', golden: 'g'});
+
+         expect(jsonResult.errorCode).toBe('RATE_LIMITED');
+         expect(jsonResult.fetched).toBe(
+             'Error: Rate limited: Quota exceeded for quota metric Assist requests.');
+
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response('Too Many Requests', {status: 429}));
+
+         const textResult =
+             await service.processRow({query: 'q', golden: 'g'});
+
+         expect(textResult.errorCode).toBe('RATE_LIMITED');
+         expect(textResult.fetched)
+             .toBe('Error: Rate limited: Rate limit exceeded');
+       });
+
+    it('should set errorCode and format fetched for HTTP error with statusText',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(new Response('', {
+           status: 500,
+           statusText: 'Internal Server Error',
+         }));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.errorCode).toBe('HTTP_500');
+         expect(result.fetched)
+             .toBe('Error: HTTP error! status: 500 Internal Server Error');
+       });
+
+    it('should set errorCode and format fetched for HTTP error without statusText',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response('', {status: 503}));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.errorCode).toBe('HTTP_503');
+         expect(result.fetched).toBe('Error: HTTP error! status: 503');
+       });
+
+    it('should include error.message from JSON response body on HTTP error',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(new Response(
+             JSON.stringify([{
+               error: {
+                 code: 403,
+                 message: 'Permission discoveryengine.sessions.assist denied.',
+                 status: 'PERMISSION_DENIED',
+               },
+             }]),
+             {status: 403}));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.errorCode).toBe('HTTP_403');
+         expect(result.fetched).toBe(
+             'Error: HTTP error! status: 403 - Permission discoveryengine.sessions.assist denied.');
+       });
+
+    it('should set errorCode to ERROR and format fetched cleanly for generic errors',
+       async () => {
+         mockBackendService.callAssistSpy.and.rejectWith(
+             new Error('Network connection lost'));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.errorCode).toBe('ERROR');
+         expect(result.fetched).toBe('Error: Network connection lost');
+       });
   });
 
   describe('processRow session handling', () => {

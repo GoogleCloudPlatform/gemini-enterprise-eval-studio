@@ -322,7 +322,8 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
               results[resultIndex] = {
                 query: row.query,
                 golden: row.golden,
-                fetched: 'SKIPPED: Incorrect or missing turn ID.',
+                fetched: 'INVALID_TURN_ID: Incorrect or missing turn ID.',
+                errorCode: 'INVALID_TURN_ID',
                 ttft: 0,
                 ttfa: 0,
                 ttlt: 0,
@@ -493,6 +494,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
 
       // Every scorer runs, one after another, so an unfetched row still gets
       // an entry per scorer and the score columns stay aligned.
+      // TODO(b/577900526): Skip scoring rows with failure errorCode during re-rate.
       const scorerResults: ScorerRunResult[] = row.fetched ?
           await this.evalService.scoreAll({
             query: row.query,

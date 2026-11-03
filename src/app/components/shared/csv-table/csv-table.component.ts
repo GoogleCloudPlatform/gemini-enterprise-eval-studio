@@ -52,6 +52,8 @@ export class CsvTableComponent implements OnChanges {
   @Input() columns: ColumnDef[] = [];
   @Input() title = '';
   @Input() exportFileName: string = 'eval_results';
+  @Input() rowErrorKey = '';
+  @Input() rowWarningValues: string[] = [];
 
   hasTruncated = false;
 
@@ -77,6 +79,9 @@ export class CsvTableComponent implements OnChanges {
       }
       if ('thoughts' in row) {
         exportedRow['Thoughts'] = row.thoughts || '';
+      }
+      if (this.rowErrorKey && this.rowErrorKey in row) {
+        exportedRow['Error Code'] = row[this.rowErrorKey] || '';
       }
       if ('projectId' in row) {
         exportedRow['Project ID'] = row.projectId || '';

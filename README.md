@@ -42,7 +42,7 @@ For **Run Evaluation**, your input CSV must include `query` and `golden` columns
 | `query` | Yes | The user prompt or question sent to the Assistant. |
 | `golden` | Yes | The expected ideal response used by the auto-rater. |
 | `conversation_id` | No | Groups rows into a single multi-turn conversation sharing session context across turns. Rows without a `conversation_id` run as independent single-turn queries. |
-| `turn` | No (Required if `conversation_id` is set) | Consecutive numeric turn order within a `conversation_id` starting at `0` or `1` (e.g., `1`, `2`, `3`). If a turn ID is missing or non-consecutive, all remaining rows in that conversation are marked `SKIPPED: Incorrect or missing turn ID.` |
+| `turn` | No (Required if `conversation_id` is set) | Consecutive numeric turn order within a `conversation_id` starting at `0` or `1` (e.g., `1`, `2`, `3`). If a turn ID is missing or non-consecutive, all remaining rows in that conversation are marked `INVALID_TURN_ID: Incorrect or missing turn ID.` |
 
 ## Scoring
 

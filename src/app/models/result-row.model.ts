@@ -23,6 +23,18 @@ export const TRACE_COLUMN_TOOLTIP =
     'Trace links might take some time to appear as traces aren\'t persisted in real time and take some time after Gemini Enterprise has responded.';
 
 /**
+ * Failure or skip category for a result row. Empty string on success.
+ */
+export type ResultErrorCode =
+    |''
+    |'SKIPPED'
+    |'FAILED'
+    |'RATE_LIMITED'
+    |'INVALID_TURN_ID'
+    |`HTTP_${number}`
+    |'ERROR';
+
+/**
  * Represents a row in the evaluation results.
  */
 export interface ResultRow {
@@ -30,6 +42,12 @@ export interface ResultRow {
   golden: string;
   fetched: string;
   thoughts?: string;
+  /**
+   * Failure category: '' on success, otherwise 'SKIPPED', 'FAILED',
+   * 'RATE_LIMITED', 'INVALID_TURN_ID', 'HTTP_<status>', or 'ERROR'. Exported
+   * as the "Error Code" CSV column.
+   */
+  errorCode?: ResultErrorCode;
   /** Time to First Token in seconds (s). */
   ttft: number;
   /** Time to First Answer Token in seconds (s). */

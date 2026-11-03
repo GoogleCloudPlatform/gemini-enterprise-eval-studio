@@ -19,7 +19,7 @@ import {Injectable} from '@angular/core';
 import {agentIdFromResourceName} from '../models/agent.model';
 import {AppConfig} from '../models/app-config.model';
 import {CSVRow} from '../models/csv-row.model';
-import {ResultRow} from '../models/result-row.model';
+import {ResultErrorCode, ResultRow} from '../models/result-row.model';
 import {ScorerRunResult, ScoringRequest} from '../scoring/scorer';
 import {ScorerRegistry} from '../scoring/scorer.registry';
 
@@ -146,6 +146,7 @@ export class EvalService {
       isFirstUserChunk: true,
     };
     let assistToken = '';
+    let errorCode: ResultErrorCode = '';
     let traceId: string|undefined;
     let sessionInfo: SessionInfo|undefined;
     const citations: Array<{title?: string; uri?: string}> = [];
@@ -160,14 +161,33 @@ export class EvalService {
       });
 
       if (!response.ok) {
+        const errorBody = await response.text().catch(() => '');
+        let errorData: any;
+        try {
+          const parsed = JSON.parse(errorBody);
+          errorData = Array.isArray(parsed) ? parsed[0] : parsed;
+        } catch {
+          // Body is not JSON; fall back to statusText or default reason.
+        }
+
         if (response.status === 429) {
-          const errorData = await response.json();
-          assistToken = errorData.details?.[0]?.assistToken || 'unknown';
+          errorCode = 'RATE_LIMITED';
+          assistToken =
+              errorData?.details?.[0]?.assistToken ||
+              errorData?.error?.details?.[0]?.assistToken ||
+              'unknown';
           const reason =
-              errorData.details?.[0]?.reason || 'Rate limit exceeded';
+              errorData?.details?.[0]?.reason ||
+              errorData?.error?.message ||
+              'Rate limit exceeded';
           throw new Error(`Rate limited: ${reason}`);
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
+        errorCode = `HTTP_${response.status}`;
+        const statusText =
+            response.statusText ? ` ${response.statusText}` : '';
+        const detail = errorData?.error?.message ?? '';
+        throw new Error(
+            `HTTP error! status: ${response.status}${detail ? ` - ${detail}` : statusText}`);
       }
 
       const reader = response.body!.getReader();
@@ -223,7 +243,11 @@ export class EvalService {
                 const reason =
                     item.answer?.assistSkippedReasons?.[0] || 'Unknown reason';
                 streamState.fullText = `SKIPPED: ${reason}`;
+                errorCode = 'SKIPPED';
                 break;
+              }
+              if (item.answer?.state === 'FAILED') {
+                errorCode = 'FAILED';
               }
               const replies = item.answer?.replies || [];
               for (const reply of replies) {
@@ -234,6 +258,11 @@ export class EvalService {
         } catch (e) {
           console.error('Error processing chunk:', e);
         }
+      }
+
+      if (errorCode === 'FAILED') {
+        streamState.fullText =
+            `FAILED: ${streamState.fullText.trim() || 'Assist operation failed.'}`;
       }
 
       if (citations.length > 0 && !streamState.fullText.startsWith('SKIPPED:')) {
@@ -260,6 +289,7 @@ export class EvalService {
           Promise.resolve(traceId);
 
       onProgress?.('score');
+      // TODO(b/577900526): Skip scoring when errorCode === 'FAILED'.
       const scorerResults = await this.scoreAll({
         query: row.query,
         response: streamState.fullText,
@@ -274,6 +304,7 @@ export class EvalService {
         golden: row.golden || '',
         fetched: streamState.fullText,
         thoughts: streamState.thoughts.join('\n'),
+        errorCode,
         ttft: Number((streamState.ttft / 1000).toFixed(2)),
         ttfa: Number((streamState.ttfa / 1000).toFixed(2)),
         ttlt: Number((ttlt / 1000).toFixed(2)),
@@ -294,11 +325,14 @@ export class EvalService {
       if (!traceId && assistToken && assistToken !== 'unknown') {
         traceId = await this.resolveTraceId(projectId, assistToken, 1);
       }
+      const errorMessage =
+          error instanceof Error ? error.message : String(error);
       return {
         query: row.query,
         golden: row.golden || '',
-        fetched: 'Error: ' + error,
+        fetched: `Error: ${errorMessage}`,
         thoughts: streamState.thoughts.join('\n'),
+        errorCode: errorCode || 'ERROR',
         ttft: 0,
         ttfa: 0,
         ttlt: 0,

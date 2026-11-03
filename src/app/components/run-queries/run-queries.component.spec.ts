@@ -19,8 +19,10 @@ import {TestBed, fakeAsync, tick} from '@angular/core/testing';
 import {BehaviorSubject, of} from 'rxjs';
 
 import {AppConfig} from '../../models/app-config.model';
+import {CSVRow} from '../../models/csv-row.model';
 import {ResultRow} from '../../models/result-row.model';
 import {AuthService} from '../../services/auth.service';
+import {CsvService} from '../../services/csv.service';
 import {EvalBackendService} from '../../services/eval-backend.service';
 import {EvalService} from '../../services/eval.service';
 import {StateService} from '../../services/state.service';
@@ -43,7 +45,7 @@ describe('RunQueriesComponent', () => {
       autoRaterModel: '',
       autoRaterInstruction: '',
       selectedDataStores: [],
-      enableWebSearch: false
+      enableWebSearch: false,
     });
 
     mockStateService = jasmine.createSpyObj(
@@ -51,11 +53,13 @@ describe('RunQueriesComponent', () => {
         [
           'getCurrentConfig',
           'getEngines',
+          'setResults',
           'setConfig',
           'setEngines',
           'setErrorMessage',
         ],
         {
+          results$: of([]),
           config$: configSubject.asObservable(),
           engines$: of([]),
           errorMessage$: of(''),
@@ -64,7 +68,8 @@ describe('RunQueriesComponent', () => {
     mockStateService.getEngines.and.returnValue(
         [{name: 'engine', displayName: 'Engine', modelConfigs: {}}]);
 
-    mockEvalService = jasmine.createSpyObj('EvalService', ['processRow']);
+    mockEvalService =
+        jasmine.createSpyObj('EvalService', ['processRow', 'scoreAll']);
 
     await TestBed
         .configureTestingModule({
@@ -73,10 +78,19 @@ describe('RunQueriesComponent', () => {
             {provide: StateService, useValue: mockStateService},
             {provide: EvalService, useValue: mockEvalService},
             {provide: AuthService, useValue: new MockAuthService()},
-            {provide: EvalBackendService, useValue: new MockEvalBackendService()},
-          ]
+            {
+              provide: EvalBackendService,
+              useValue: new MockEvalBackendService(),
+            },
+          ],
         })
         .compileComponents();
+  });
+
+  it('should create', () => {
+    const fixture = TestBed.createComponent(RunQueriesComponent);
+    const component = fixture.componentInstance;
+    expect(component).toBeTruthy();
   });
 
   it('should run every row against the settings captured when the run started',
@@ -99,13 +113,13 @@ describe('RunQueriesComponent', () => {
                ttft: 0,
                ttfa: 0,
                ttlt: 0,
-               scorerResults: []
+               scorerResults: [],
              };
            });
 
        component.startResponseGeneration({
          file: new File([], 'test.csv'),
-         rows: [{query: 'q1'}, {query: 'q2'}, {query: 'q3'}]
+         rows: [{query: 'q1'}, {query: 'q2'}, {query: 'q3'}],
        });
        tick();
 
@@ -132,7 +146,7 @@ describe('RunQueriesComponent', () => {
                ttft: 0,
                ttfa: 0,
                ttlt: 0,
-               scorerResults: []
+               scorerResults: [],
              });
            }));
 
@@ -148,5 +162,98 @@ describe('RunQueriesComponent', () => {
        tick();
        fixture.detectChanges();
        expect(fieldset().disabled).toBeFalse();
+     }));
+
+  it('should map errorCode onto responseResults, highlight SKIPPED and error rows, and export Error Code to CSV',
+     fakeAsync(() => {
+       const csvService = TestBed.inject(CsvService);
+       const exportSpy =
+           spyOn(csvService, 'exportCSV').and.callFake(() => {});
+
+       const fixture = TestBed.createComponent(RunQueriesComponent);
+       const component = fixture.componentInstance;
+       fixture.detectChanges();
+
+       const mockResponses: Record<string, ResultRow> = {
+         'Hi': {
+           query: 'Hi',
+           golden: '',
+           fetched: 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           errorCode: 'SKIPPED',
+           ttft: 0,
+           ttfa: 0,
+           ttlt: 1.2,
+           scorerResults: [],
+         },
+         'Normal query': {
+           query: 'Normal query',
+           golden: '',
+           fetched: 'Valid response',
+           errorCode: '',
+           ttft: 1,
+           ttfa: 2,
+           ttlt: 3,
+           scorerResults: [],
+         },
+         'Failed query': {
+           query: 'Failed query',
+           golden: '',
+           fetched: 'Error: HTTP error! status: 500 Internal Server Error',
+           errorCode: 'HTTP_500',
+           ttft: 0,
+           ttfa: 0,
+           ttlt: 0,
+           scorerResults: [],
+         },
+       };
+
+       mockEvalService.processRow.and.callFake(
+           async (row: CSVRow) => mockResponses[row.query]);
+
+       component.startResponseGeneration({
+         file: new File([], 'queries.csv'),
+         rows: [
+           {query: 'Hi'},
+           {query: 'Normal query'},
+           {query: 'Failed query'},
+         ],
+       });
+       tick();
+       fixture.detectChanges();
+
+       expect(component.responseResults.length).toBe(3);
+       expect(component.responseResults[0]['errorCode']).toBe('SKIPPED');
+       expect(component.responseResults[1]['errorCode']).toBe('');
+       expect(component.responseResults[2]['errorCode']).toBe('HTTP_500');
+
+       const rows = Array.from(
+           fixture.nativeElement.querySelectorAll('tbody tr')) as
+           HTMLTableRowElement[];
+       expect(rows.length).toBe(3);
+
+       expect(rows[0].classList.contains('bg-amber-50')).toBeTrue();
+       expect(rows[0].classList.contains('!border-l-amber-500')).toBeTrue();
+
+       expect(rows[1].classList.contains('bg-amber-50')).toBeFalse();
+       expect(rows[1].classList.contains('bg-red-50')).toBeFalse();
+
+       expect(rows[2].classList.contains('bg-red-50')).toBeTrue();
+       expect(rows[2].classList.contains('!border-l-red-500')).toBeTrue();
+
+       const buttons = Array.from(
+           fixture.nativeElement.querySelectorAll('button')) as
+           HTMLButtonElement[];
+       const exportBtn =
+           buttons.find(btn => btn.textContent?.trim() === 'Export CSV');
+       expect(exportBtn).toBeDefined();
+       exportBtn!.click();
+
+       expect(exportSpy).toHaveBeenCalledTimes(1);
+       const exportedData =
+           exportSpy.calls.mostRecent().args[0] as Array<Record<string, unknown>>;
+       expect(exportedData.length).toBe(3);
+       expect(exportedData[0]['Error Code']).toBe('SKIPPED');
+       expect(exportedData[1]['Error Code']).toBe('');
+       expect(exportedData[2]['Error Code']).toBe('HTTP_500');
      }));
 });

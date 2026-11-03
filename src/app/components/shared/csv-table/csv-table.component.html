@@ -34,10 +34,20 @@
         </tr>
       </thead>
       <tbody class="bg-white divide-y divide-gray-200">
-        <tr *ngFor="let row of data; let i = index" class="hover:bg-gray-50 transition-colors">
+        <tr
+          *ngFor="let row of data; let i = index"
+          class="transition-colors"
+          [ngClass]="
+            rowErrorKey && row[rowErrorKey]
+              ? rowWarningValues.includes(row[rowErrorKey])
+                ? 'bg-amber-50 hover:bg-amber-100 border-l-4 !border-l-amber-500'
+                : 'bg-red-50 hover:bg-red-100 border-l-4 !border-l-red-500'
+              : 'hover:bg-gray-50'
+          "
+        >
           <td
             *ngFor="let col of columns"
-            class="px-6 py-4 text-sm text-gray-500"
+            class="px-6 py-4 text-sm text-gray-600"
             [ngClass]="col.truncate ? (col.width || 'w-96') + ' break-words' : (col.width || '')"
           >
             <!-- Text Type -->

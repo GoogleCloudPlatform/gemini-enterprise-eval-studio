@@ -23,6 +23,7 @@ import {ResultRow, TRACE_COLUMN_TOOLTIP} from '../../models/result-row.model';
 import {ScoreResult, Scorer, ScorerRunResult, ScoringRequest} from '../../scoring/scorer';
 import {SCORERS} from '../../scoring/scorer.registry';
 import {AuthService} from '../../services/auth.service';
+import {CsvService} from '../../services/csv.service';
 import {EvalBackendService} from '../../services/eval-backend.service';
 import {EvalService} from '../../services/eval.service';
 import {StateService} from '../../services/state.service';
@@ -518,7 +519,7 @@ describe('RunEvaluationComponent', () => {
        expect(startedBeforeFinished['b2']).toContain('b1');
      }));
 
-  it('should sort unnumbered turns after numbered turns and mark them SKIPPED',
+  it('should sort unnumbered turns after numbered turns and mark them INVALID_TURN_ID',
      fakeAsync(() => {
        const fixture = TestBed.createComponent(RunEvaluationComponent);
        const component = fixture.componentInstance;
@@ -554,9 +555,11 @@ describe('RunEvaluationComponent', () => {
        expect(finalResults.map(r => r.fetched)).toEqual([
          'fetched-turn1',
          'fetched-turn2',
-         'SKIPPED: Incorrect or missing turn ID.',
-         'SKIPPED: Incorrect or missing turn ID.',
+         'INVALID_TURN_ID: Incorrect or missing turn ID.',
+         'INVALID_TURN_ID: Incorrect or missing turn ID.',
        ]);
+       expect(finalResults[2].errorCode).toBe('INVALID_TURN_ID');
+       expect(finalResults[3].errorCode).toBe('INVALID_TURN_ID');
      }));
 
   it('should preserve 0-indexed turn numbers in sorting and results',
@@ -593,7 +596,7 @@ describe('RunEvaluationComponent', () => {
        expect(finalResults.map(r => r.turn)).toEqual([0, 1]);
      }));
 
-  it('should sort non-numeric turn strings last and mark them SKIPPED',
+  it('should sort non-numeric turn strings last and mark them INVALID_TURN_ID',
      fakeAsync(() => {
        const fixture = TestBed.createComponent(RunEvaluationComponent);
        const component = fixture.componentInstance;
@@ -627,8 +630,8 @@ describe('RunEvaluationComponent', () => {
        const finalResults = resultsSubject.value;
        expect(finalResults.map(r => r.fetched)).toEqual([
          'fetched-turn1',
-         'SKIPPED: Incorrect or missing turn ID.',
-         'SKIPPED: Incorrect or missing turn ID.',
+         'INVALID_TURN_ID: Incorrect or missing turn ID.',
+         'INVALID_TURN_ID: Incorrect or missing turn ID.',
        ]);
      }));
 
@@ -675,19 +678,19 @@ describe('RunEvaluationComponent', () => {
              {query: 'c1-t2', fetched: 'fetched-c1-t2'},
              {
                query: 'c1-t4',
-               fetched: 'SKIPPED: Incorrect or missing turn ID.'
+               fetched: 'INVALID_TURN_ID: Incorrect or missing turn ID.'
              },
              {
                query: 'c1-missing',
-               fetched: 'SKIPPED: Incorrect or missing turn ID.'
+               fetched: 'INVALID_TURN_ID: Incorrect or missing turn ID.'
              },
              {
                query: 'c2-t2',
-               fetched: 'SKIPPED: Incorrect or missing turn ID.'
+               fetched: 'INVALID_TURN_ID: Incorrect or missing turn ID.'
              },
              {
                query: 'c2-t3',
-               fetched: 'SKIPPED: Incorrect or missing turn ID.'
+               fetched: 'INVALID_TURN_ID: Incorrect or missing turn ID.'
              },
            ]);
      }));
@@ -1442,4 +1445,122 @@ describe('RunEvaluationComponent', () => {
            headers.find(th => th.textContent?.trim() === 'Query');
        expect(queryHeader?.querySelector('app-info-tooltip')).toBeNull();
      });
+
+  it('should apply amber row styling on SKIPPED rows and red row styling on error rows in the results table', () => {
+    const fixture = TestBed.createComponent(RunEvaluationComponent);
+    const component = fixture.componentInstance;
+    component.step = 3;
+    resultsSubject.next([
+      {
+        query: 'Hi',
+        golden: 'g1',
+        fetched: 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+        errorCode: 'SKIPPED',
+        ttft: 0,
+        ttfa: 0,
+        ttlt: 1.8,
+        scorerResults: [],
+      },
+      {
+        query: 'Normal query',
+        golden: 'g2',
+        fetched: 'Valid response',
+        errorCode: '',
+        ttft: 1,
+        ttfa: 2,
+        ttlt: 3,
+        scorerResults: scored(0.9),
+      },
+      {
+        query: 'Failed query',
+        golden: 'g3',
+        fetched: 'Error: HTTP error! status: 500 Internal Server Error',
+        errorCode: 'HTTP_500',
+        ttft: 0,
+        ttfa: 0,
+        ttlt: 0,
+        scorerResults: [],
+      },
+    ]);
+    fixture.detectChanges();
+
+    const rows = Array.from(
+        fixture.nativeElement.querySelectorAll('tbody tr')) as
+        HTMLTableRowElement[];
+    expect(rows.length).toBe(3);
+
+    expect(rows[0].classList.contains('bg-amber-50')).toBeTrue();
+    expect(rows[0].classList.contains('hover:bg-amber-100')).toBeTrue();
+    expect(rows[0].classList.contains('border-l-4')).toBeTrue();
+    expect(rows[0].classList.contains('!border-l-amber-500')).toBeTrue();
+
+    expect(rows[1].classList.contains('bg-red-50')).toBeFalse();
+    expect(rows[1].classList.contains('bg-amber-50')).toBeFalse();
+    expect(rows[1].classList.contains('!border-l-red-500')).toBeFalse();
+    expect(rows[1].classList.contains('!border-l-amber-500')).toBeFalse();
+    expect(rows[1].classList.contains('hover:bg-gray-50')).toBeTrue();
+
+    expect(rows[2].classList.contains('bg-red-50')).toBeTrue();
+    expect(rows[2].classList.contains('hover:bg-red-100')).toBeTrue();
+    expect(rows[2].classList.contains('border-l-4')).toBeTrue();
+    expect(rows[2].classList.contains('!border-l-red-500')).toBeTrue();
+  });
+
+  it('should include Error Code column when exporting results to CSV', () => {
+    const csvService = TestBed.inject(CsvService);
+    const exportSpy = spyOn(csvService, 'exportCSV').and.callFake(() => {});
+
+    const fixture = TestBed.createComponent(RunEvaluationComponent);
+    const component = fixture.componentInstance;
+    component.step = 3;
+    resultsSubject.next([
+      {
+        query: 'Hi',
+        golden: 'g1',
+        fetched: 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+        errorCode: 'SKIPPED',
+        ttft: 0,
+        ttfa: 0,
+        ttlt: 1.8,
+        scorerResults: [],
+      },
+      {
+        query: 'Normal query',
+        golden: 'g2',
+        fetched: 'Valid response',
+        errorCode: '',
+        ttft: 1,
+        ttfa: 2,
+        ttlt: 3,
+        scorerResults: scored(0.9),
+      },
+      {
+        query: 'Failed query',
+        golden: 'g3',
+        fetched: 'Error: HTTP error! status: 500 Internal Server Error',
+        errorCode: 'HTTP_500',
+        ttft: 0,
+        ttfa: 0,
+        ttlt: 0,
+        scorerResults: [],
+      },
+    ]);
+    fixture.detectChanges();
+
+    const buttons = Array.from(
+        fixture.nativeElement.querySelectorAll('button')) as
+        HTMLButtonElement[];
+    const exportBtn =
+        buttons.find(btn => btn.textContent?.trim() === 'Export CSV');
+    expect(exportBtn).toBeDefined();
+    exportBtn!.click();
+
+    expect(exportSpy).toHaveBeenCalledTimes(1);
+    const exportedData =
+        exportSpy.calls.mostRecent().args[0] as Array<Record<string, unknown>>;
+    expect(exportedData.length).toBe(3);
+    expect(exportedData[0]['Error Code']).toBe('SKIPPED');
+    expect(exportedData[1]['Error Code']).toBe('');
+    expect(exportedData[2]['Error Code']).toBe('HTTP_500');
+  });
 });

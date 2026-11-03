@@ -150,6 +150,7 @@ export class RunQueriesComponent {
         query: result.query,
         response: result.fetched,
         thoughts: result.thoughts,
+        errorCode: result.errorCode,
         ttft: result.ttft,
         ttfa: result.ttfa,
         ttlt: result.ttlt,
