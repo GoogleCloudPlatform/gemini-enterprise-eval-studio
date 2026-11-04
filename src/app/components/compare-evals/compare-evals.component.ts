@@ -308,6 +308,30 @@ export class CompareEvalsComponent {
     });
     this.cdr.detectChanges();
   }
+
+  /**
+   * The badge colors for a score delta: green above 0.1, red below -0.1 and
+   * gray in between.
+   *
+   * Computed here rather than with an `[ngClass]` object in the template.
+   * Angular compiles such an object into a call like
+   * `f(d > 0.1, d < -0.1, d >= -0.1 && d <= 0.1)`, which the JS coverage
+   * instrumenter parses as TypeScript: it reads `d < -0.1, d >` as type
+   * arguments and fails, breaking coverage builds.
+   *
+   * @param delta The recent score minus the baseline score.
+   * @returns The CSS classes, or an empty string for NaN.
+   */
+  deltaClass(delta: number): string {
+    if (delta > 0.1) {
+      return 'bg-green-100 text-green-700';
+    }
+    if (delta < -0.1) {
+      return 'bg-red-100 text-red-700';
+    }
+    // Any number left is within -0.1 to 0.1; NaN gets no color.
+    return isNaN(delta) ? '' : 'bg-gray-100 text-gray-600';
+  }
 }
 
 /** Strips the whitespace and byte order mark a CSV header may carry. */

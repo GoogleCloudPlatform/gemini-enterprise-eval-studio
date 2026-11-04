@@ -162,4 +162,49 @@ export class CsvTableComponent implements OnChanges {
   isExpanded(rowIndex: number, key: string): boolean {
     return this.expandedCells.get(`${rowIndex}-${key}`) || false;
   }
+
+  /**
+   * The text color of a score cell: green from 0.8, yellow from 0.5 and red
+   * below that.
+   *
+   * This and `deltaClass` are computed here rather than with `[ngClass]`
+   * objects in the template. Angular compiles such an object into a call like
+   * `f(v > 0.1, v < -0.1, v >= -0.1 && v <= 0.1)`, which the JS coverage
+   * instrumenter parses as TypeScript: it reads `v < -0.1, v >` as type
+   * arguments and fails, breaking coverage builds.
+   *
+   * @param score The cell value.
+   * @returns The CSS class, or an empty string when the value does not convert
+   *     to a number.
+   */
+  scoreClass(score: number): string {
+    if (score >= 0.8) {
+      return 'text-green-600';
+    }
+    if (score >= 0.5) {
+      return 'text-yellow-600';
+    }
+    // Any number left is below 0.5; a value that does not convert to a number
+    // gets no color.
+    return isNaN(score) ? '' : 'text-red-600';
+  }
+
+  /**
+   * The text color of a delta cell: green above 0.1, red below -0.1 and gray
+   * in between.
+   * @param delta The cell value.
+   * @returns The CSS class, or an empty string when the value does not convert
+   *     to a number.
+   */
+  deltaClass(delta: number): string {
+    if (delta > 0.1) {
+      return 'text-green-600';
+    }
+    if (delta < -0.1) {
+      return 'text-red-600';
+    }
+    // Any number left is within -0.1 to 0.1; a value that does not convert to
+    // a number gets no color.
+    return isNaN(delta) ? '' : 'text-gray-600';
+  }
 }

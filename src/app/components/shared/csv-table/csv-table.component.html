@@ -109,26 +109,14 @@
 
             <!-- Score Type -->
             <div *ngIf="col.type === 'score'" class="font-medium">
-              <span
-                [ngClass]="{
-                  'text-green-600': (row[col.key] >= 0.8),
-                  'text-yellow-600': (row[col.key] >= 0.5 && row[col.key] < 0.8),
-                  'text-red-600': (row[col.key] < 0.5)
-                }"
-              >
+              <span [ngClass]="scoreClass(row[col.key])">
                 {{ row[col.key] }}
               </span>
             </div>
 
             <!-- Delta Type -->
             <div *ngIf="col.type === 'delta'" class="font-medium">
-              <span
-                [ngClass]="{
-                  'text-green-600': (row[col.key] > 0.1),
-                  'text-red-600': (row[col.key] < -0.1),
-                  'text-gray-600': (row[col.key] >= -0.1 && row[col.key] <= 0.1)
-                }"
-              >
+              <span [ngClass]="deltaClass(row[col.key])">
                 {{ row[col.key] > 0 ? "+" : "" }}{{ row[col.key] }}
               </span>
               <span

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {TestBed} from '@angular/core/testing';
+import {ComponentFixture, TestBed} from '@angular/core/testing';
 
 import {CsvService} from '../../services/csv.service';
 
@@ -22,6 +22,7 @@ import {CompareEvalsComponent} from './compare-evals.component';
 
 describe('CompareEvalsComponent', () => {
   let mockCsvService: jasmine.SpyObj<CsvService>;
+  let fixture: ComponentFixture<CompareEvalsComponent>;
   let component: CompareEvalsComponent;
 
   beforeEach(async () => {
@@ -35,7 +36,7 @@ describe('CompareEvalsComponent', () => {
         })
         .compileComponents();
 
-    const fixture = TestBed.createComponent(CompareEvalsComponent);
+    fixture = TestBed.createComponent(CompareEvalsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
   });
@@ -134,5 +135,41 @@ describe('CompareEvalsComponent', () => {
 
     expect(component.comparisonResults).toEqual([]);
     expect(component.compareError).toContain('share no scoring method');
+  });
+
+  describe('deltaClass', () => {
+    it('should color deltas beyond 0.1 green or red and the rest gray', () => {
+      expect(component.deltaClass(0.11)).toBe('bg-green-100 text-green-700');
+      expect(component.deltaClass(0.1)).toBe('bg-gray-100 text-gray-600');
+      expect(component.deltaClass(0)).toBe('bg-gray-100 text-gray-600');
+      expect(component.deltaClass(-0.1)).toBe('bg-gray-100 text-gray-600');
+      expect(component.deltaClass(-0.11)).toBe('bg-red-100 text-red-700');
+    });
+
+    it('should leave a delta that is not a number uncolored', () => {
+      expect(component.deltaClass(Number.NaN)).toBe('');
+    });
+
+    it('should color the delta badges of the side-by-side comparison', () => {
+      upload('baseline', [
+        {'Query': 'q', 'Fetched': 'f', 'A Score': '0.5', 'B Score': '0.5'},
+      ]);
+      upload('recent', [
+        {'Query': 'q', 'Fetched': 'f', 'A Score': '0.75', 'B Score': '0.45'},
+      ]);
+
+      component.compareEvals();
+      fixture.detectChanges();
+
+      const badges = Array.from(
+          fixture.nativeElement.querySelectorAll('div.rounded-full') as
+          NodeListOf<HTMLElement>);
+      expect(badges.map(badge => badge.textContent?.trim())).toEqual([
+        '+0.25',
+        '-0.05',
+      ]);
+      expect(badges[0].classList.contains('text-green-700')).toBeTrue();
+      expect(badges[1].classList.contains('text-gray-600')).toBeTrue();
+    });
   });
 });
