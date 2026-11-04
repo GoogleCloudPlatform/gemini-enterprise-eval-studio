@@ -34,7 +34,11 @@ export interface ScoringRequest {
  * The outcome a scorer produces for a single evaluated row.
  */
 export interface ScoreResult {
-  /** Normalized score, where 0.0 is the worst and 1.0 the best. */
+  /**
+   * Normalized score, where 0.0 is the worst and 1.0 the best. `EvalService`
+   * reports anything that is not a finite number in that range as the
+   * scorer's error for the row instead of storing it.
+   */
   score: number;
   /**
    * Optional scorer-specific sub-metrics (e.g., recall, precision,
@@ -57,11 +61,29 @@ export interface ScorerRunResult {
   /** The scorer's error message, when it threw. */
   error?: string;
   /**
+   * Whether `error` concerns this row's content only, such as a score outside
+   * 0.0 to 1.0, rather than the scorer or its backend. A re-rate records such
+   * an error on the row and moves on, as a normal run does.
+   */
+  rowError?: boolean;
+  /**
    * Whether the scorer was skipped (because it requires a golden answer and
    * the row has none, or because the row itself is not scorable during
    * re-rating).
    */
   skipped?: boolean;
+}
+
+/**
+ * A scoring failure that concerns the evaluated row only, such as a score
+ * outside 0.0 to 1.0, as opposed to the scorer or its backend failing.
+ * `EvalService` records it on the row with `ScorerRunResult.rowError` set.
+ */
+export class RowScoreError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RowScoreError';
+  }
 }
 
 /**

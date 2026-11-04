@@ -20,7 +20,7 @@ import {agentIdFromResourceName} from '../models/agent.model';
 import {AppConfig} from '../models/app-config.model';
 import {CSVRow} from '../models/csv-row.model';
 import {ResultErrorCode, ResultRow, isScorableRow} from '../models/result-row.model';
-import {ScorerRunResult, ScoringRequest} from '../scoring/scorer';
+import {RowScoreError, ScorerRunResult, ScoringRequest} from '../scoring/scorer';
 import {ScorerRegistry} from '../scoring/scorer.registry';
 
 import {EvalBackendService} from './eval-backend.service';
@@ -54,6 +54,33 @@ interface AssistRequestBody {
   };
   /** Routes the query to a published agent instead of the default assistant. */
   agentsSpec?: {agentSpecs: Array<{agentId: string}>};
+}
+
+/**
+ * Checks that a score honors the `ScoreResult` contract.
+ * @param score The score a scorer returned.
+ * @throws A `RowScoreError` with a user facing message when the score is not
+ *     a finite number between 0.0 and 1.0 inclusive.
+ */
+function assertNormalizedScore(score: number): void {
+  // A scorer that builds its result from a parsed reply can hand over a
+  // string despite the type. Naming the type keeps the message from reading
+  // as "0.5 is not a number".
+  if (typeof score !== 'number') {
+    const type = typeof score;
+    throw new RowScoreError(
+        `Score ${score} (${type}) is not a number between 0.0 and 1.0.`);
+  }
+  // Every comparison with NaN is false, so the range check alone would let it
+  // through; `Number.isFinite` also rejects the infinities.
+  if (!Number.isFinite(score)) {
+    throw new RowScoreError(
+        `Score ${score} is not a number between 0.0 and 1.0.`);
+  }
+  if (score < 0 || score > 1) {
+    throw new RowScoreError(
+        `Score ${score} is outside the 0.0 to 1.0 range.`);
+  }
 }
 
 /**
@@ -465,6 +492,11 @@ export class EvalService {
 
       try {
         const result = await scorer.score(request);
+        // The results table, the CSV export and Compare Evals all assume a
+        // score between 0.0 and 1.0, so anything else is a scorer failure to
+        // report on the row rather than a value to store. The auto-rater can
+        // produce one when the judge answers in prose ("8/10" parses as 80).
+        assertNormalizedScore(result.score);
         entry.score = result.score;
         if (result.details) {
           console.debug(
@@ -478,6 +510,9 @@ export class EvalService {
         // A rejection is not necessarily an `Error`, so a thrown string or
         // object still gets a readable message instead of `undefined`.
         entry.error = error instanceof Error ? error.message : String(error);
+        if (error instanceof RowScoreError) {
+          entry.rowError = true;
+        }
       }
       results.push(entry);
     }

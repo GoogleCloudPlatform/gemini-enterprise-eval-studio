@@ -765,6 +765,47 @@ describe('RunEvaluationComponent', () => {
            .toBe('Scoring failed for some rows: boom');
      }));
 
+  it('should finish a run whose first row has a row error', fakeAsync(() => {
+       const fixture = TestBed.createComponent(RunEvaluationComponent);
+       const component = fixture.componentInstance;
+       fixture.detectChanges();
+
+       const outOfRange: ScorerRunResult = {
+         scorerId: 'first',
+         displayName: 'First',
+         score: 0,
+         error: 'Score 2026 is outside the 0.0 to 1.0 range.',
+         rowError: true,
+       };
+       mockEvalService.processRow.and.callFake(async row => ({
+                                                 query: row.query,
+                                                 golden: row.golden ?? '',
+                                                 fetched: 'f',
+                                                 ttft: 1,
+                                                 ttfa: 2,
+                                                 ttlt: 3,
+                                                 scorerResults: row.query === 'q1' ?
+                                                     [outOfRange] :
+                                                     [{
+                                                       scorerId: 'first',
+                                                       displayName: 'First',
+                                                       score: 0.5
+                                                     }]
+                                               }));
+
+       component.startEvaluation({
+         file: new File([], 'test.csv'),
+         rows: [{query: 'q1', golden: 'g1'}, {query: 'q2', golden: 'g2'}]
+       });
+       tick();
+
+       expect(component.completedRows).toBe(2);
+       expect(component.isProcessing).toBeFalse();
+       expect(component.errorMessage)
+           .toBe('Scoring failed for some rows: Score 2026 is outside the ' +
+                 '0.0 to 1.0 range.');
+     }));
+
   describe('score columns', () => {
     beforeEach(() => {
       TestBed.overrideProvider(SCORERS, {
@@ -896,6 +937,61 @@ describe('RunEvaluationComponent', () => {
 
       expect(component.displayResults[0]['scoreError_second']).toBe('boom');
       expect(component.displayResults[0]['scoreError_first']).toBe('');
+    });
+
+    it('should leave the score cell blank when the scorer failed', () => {
+      select('first', 'second');
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      resultsSubject.next([rowWith([
+        {scorerId: 'first', displayName: 'First', score: 0.25},
+        {
+          scorerId: 'second',
+          displayName: 'Second',
+          score: 0,
+          error: 'Score 2026 is outside the 0.0 to 1.0 range.',
+          rowError: true,
+        },
+      ])]);
+
+      // A blank cell keeps Compare Evals from reading the placeholder 0 as a
+      // real score; the error column carries the reason.
+      expect(component.displayResults[0]['score_first']).toBe(0.25);
+      expect(component.displayResults[0]['score_second']).toBe('');
+      expect(component.displayResults[0]['scoreError_second'])
+          .toBe('Score 2026 is outside the 0.0 to 1.0 range.');
+    });
+
+    it('should flatten a row error into the same columns as a clean row', () => {
+      select('first', 'second');
+      const fixture = TestBed.createComponent(RunEvaluationComponent);
+      const component = fixture.componentInstance;
+      fixture.detectChanges();
+
+      resultsSubject.next([
+        rowWith([
+          {scorerId: 'first', displayName: 'First', score: 0.25},
+          {scorerId: 'second', displayName: 'Second', score: 0.75},
+        ]),
+        rowWith([
+          {scorerId: 'first', displayName: 'First', score: 0.25},
+          {
+            scorerId: 'second',
+            displayName: 'Second',
+            score: 0,
+            error: 'Score 2026 is outside the 0.0 to 1.0 range.',
+            rowError: true,
+          },
+        ]),
+      ]);
+
+      // The flag only steers the re-rate, so neither the table nor the CSV
+      // export built from these rows gains a column for it.
+      expect(Object.keys(component.displayResults[1]))
+          .toEqual(Object.keys(component.displayResults[0]));
+      expect(component.displayResults[1]['rowError']).toBeUndefined();
     });
 
     it('should not change the columns when rows bring errors or other scorers',
@@ -1070,6 +1166,61 @@ describe('RunEvaluationComponent', () => {
          expect(component.errorMessage).toContain('quota exceeded');
          expect(resultsSubject.value.map(row => row.scorerResults))
              .toEqual([scored(0.1), scored(0.2)]);
+       }));
+
+    it('should record a row error and keep re-rating the remaining rows',
+       fakeAsync(() => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         resultsSubject.next([
+           {
+             query: 'q1',
+             golden: 'g1',
+             fetched: 'f1',
+             ttft: 1,
+             ttfa: 2,
+             ttlt: 3,
+             scorerResults: scored(0.1)
+           },
+           {
+             query: 'q2',
+             golden: 'g2',
+             fetched: 'f2',
+             ttft: 1,
+             ttfa: 2,
+             ttlt: 3,
+             scorerResults: scored(0.2)
+           },
+         ]);
+         // The first row's judge answered in prose, which the contract check
+         // reports on that row only; the second row scores normally.
+         const outOfRange: ScorerRunResult = {
+           scorerId: 'first',
+           displayName: 'First',
+           score: 0,
+           error: 'Score 80 is outside the 0.0 to 1.0 range.',
+           rowError: true,
+         };
+         mockEvalService.scoreAll.and.callFake(
+             async request => request.query === 'q1' ?
+                 [outOfRange] :
+                 [{scorerId: 'first', displayName: 'First', score: 0.9}]);
+
+         component.openReRateModal();
+         component.startReRate();
+         tick();
+
+         expect(mockEvalService.scoreAll).toHaveBeenCalledTimes(2);
+         expect(resultsSubject.value.map(row => row.scorerResults)).toEqual([
+           [outOfRange],
+           [{scorerId: 'first', displayName: 'First', score: 0.9}],
+         ]);
+         expect(component.errorMessage)
+             .toBe('Scoring failed for some rows: Score 80 is outside the ' +
+                   '0.0 to 1.0 range.');
+         expect(component.progress).toBe(100);
        }));
 
     it('should skip scoring a row that was never fetched', fakeAsync(() => {

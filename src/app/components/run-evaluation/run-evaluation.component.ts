@@ -208,7 +208,11 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       const flat: Record<string, unknown> = {...rest};
       for (const {id} of this.scorerColumns) {
         const result = scorerResults.find(r => r.scorerId === id);
-        flat[scoreKey(id)] = result && !result.skipped ? result.score : '';
+        // A skipped or failed scorer has no score, so its cell stays blank
+        // rather than showing the placeholder 0, which Compare Evals would read
+        // as a real score.
+        flat[scoreKey(id)] =
+            result && !result.skipped && !result.error ? result.score : '';
         flat[scoreErrorKey(id)] = result?.error ?? '';
       }
       return flat;
@@ -480,6 +484,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
 
     this.errorMessage = null;
     const newResults: ResultRow[] = [];
+    let aborted = false;
 
     for (let i = 0; i < this.results.length; i++) {
       if (!this.isProcessing) {
@@ -522,15 +527,24 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
         break;
       }
 
-      const scoreError = firstScorerError(scorerResults);
+      // A row error, such as a score outside 0.0 to 1.0, is recorded on the
+      // row as on a normal run; only a failure that would repeat on every row
+      // stops the re-rate.
+      const scoreError =
+          firstScorerError(scorerResults.filter(result => !result.rowError));
       if (scoreError) {
         // Stop on the first failure rather than replaying the same broken
         // credentials or quota against every remaining row.
         this.errorMessage = `Re-rating failed: ${scoreError}`;
+        aborted = true;
         for (let j = i; j < this.results.length; j++) {
           newResults.push(this.results[j]);
         }
         break;
+      }
+      const rowError = firstScorerError(scorerResults);
+      if (rowError && !this.errorMessage) {
+        this.errorMessage = `Scoring failed for some rows: ${rowError}`;
       }
       newResults.push({...row, scorerResults});
 
@@ -538,7 +552,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
       this.cdr.detectChanges();
     }
 
-    if (!this.errorMessage && this.isProcessing) {
+    if (!aborted && this.isProcessing) {
       this.progress = 100;
     }
     this.stateService.setResults(newResults);

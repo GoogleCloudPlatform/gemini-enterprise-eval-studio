@@ -6,6 +6,8 @@ normalized score between `0.0` and `1.0`. Rows with a non-empty `errorCode`
 (`SKIPPED`, `FAILED`, `ERROR`, `INVALID_TURN_ID`, or `SESSION_FAILED`) are not
 scored, and their score cells are left blank in the results table and CSV export
 (as are entries skipped by a scorer when a required `golden` answer is missing).
+`EvalService` enforces the `0.0` to `1.0` range: a scorer that returns anything
+else is reported as failed for that row rather than stored.
 
 | File | Role |
 | --- | --- |

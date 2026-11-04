@@ -180,6 +180,108 @@ describe('EvalService', () => {
          expect(results[0].error).toBe('Quota Exceeded');
        });
 
+    it('should report a score outside 0.0 to 1.0 as the scorer\'s error instead of storing it',
+       async () => {
+         const service = setUp([
+           new FakeScorer('high', 'High', async () => ({score: 1.5})),
+           new FakeScorer('low', 'Low', async () => ({score: -0.2})),
+           new FakeScorer(
+               'infinite', 'Infinite', async () => ({score: Infinity})),
+         ]);
+
+         const results = await service.scoreAll({
+           query: 'q',
+           response: 'r',
+           golden: 'g',
+           config: {...CONFIG, selectedScorers: ['high', 'low', 'infinite']}
+         });
+
+         expect(results[0].error)
+             .toBe('Score 1.5 is outside the 0.0 to 1.0 range.');
+         expect(results[0].score).toBe(0);
+         expect(results[0].rowError).toBeTrue();
+         expect(results[1].error)
+             .toBe('Score -0.2 is outside the 0.0 to 1.0 range.');
+         expect(results[1].score).toBe(0);
+         expect(results[2].error)
+             .toBe('Score Infinity is not a number between 0.0 and 1.0.');
+         expect(results[2].score).toBe(0);
+       });
+
+    it('should report a score that is not a number as the scorer\'s error',
+       async () => {
+         const service = setUp([
+           new FakeScorer('nan', 'NaN', async () => ({score: Number.NaN})),
+           // A scorer that reads its score out of a parsed reply can return a
+           // string despite the type.
+           new FakeScorer(
+               'text', 'Text',
+               async () => ({score: '0.5' as unknown as number})),
+         ]);
+
+         const results = await service.scoreAll({
+           query: 'q',
+           response: 'r',
+           golden: 'g',
+           config: {...CONFIG, selectedScorers: ['nan', 'text']}
+         });
+
+         expect(results[0].error)
+             .toBe('Score NaN is not a number between 0.0 and 1.0.');
+         expect(results[0].score).toBe(0);
+         expect(results[1].error)
+             .toBe('Score 0.5 (string) is not a number between 0.0 and 1.0.');
+         expect(results[1].score).toBe(0);
+       });
+
+    it('should mark only contract violations as row errors', async () => {
+      const service = setUp([
+        new FakeScorer('year', 'Year', async () => ({score: 2026})),
+        new FakeScorer('broken', 'Broken', async () => {
+          throw new Error('quota exceeded');
+        }),
+      ]);
+
+      const results = await service.scoreAll({
+        query: 'q',
+        response: 'r',
+        golden: 'g',
+        config: {...CONFIG, selectedScorers: ['year', 'broken']}
+      });
+
+      expect(results[0].rowError).toBeTrue();
+      expect(results[1].error).toBe('quota exceeded');
+      expect(results[1].rowError).toBeUndefined();
+    });
+
+    it('should accept the boundary scores and keep scoring the other scorers after an out-of-range one',
+       async () => {
+         const service = setUp([
+           new FakeScorer('zero', 'Zero', async () => ({score: 0})),
+           new FakeScorer('year', 'Year', async () => ({score: 2026})),
+           new FakeScorer('one', 'One', async () => ({score: 1})),
+         ]);
+
+         const results = await service.scoreAll({
+           query: 'q',
+           response: 'r',
+           golden: 'g',
+           config: {...CONFIG, selectedScorers: ['zero', 'year', 'one']}
+         });
+
+         expect(results).toEqual([
+           {scorerId: 'zero', displayName: 'Zero', score: 0},
+           {
+             scorerId: 'year',
+             displayName: 'Year',
+             score: 0,
+             error: 'Score 2026 is outside the 0.0 to 1.0 range.',
+             rowError: true,
+           },
+           {scorerId: 'one', displayName: 'One', score: 1},
+         ]);
+       });
+
     it('should skip a scorer that needs a golden answer when there is none',
        async () => {
          const needsGolden = new FakeScorer(
@@ -610,6 +712,31 @@ describe('EvalService', () => {
         },
       ]);
     });
+
+    it('should keep the other scores when one scorer returns an out-of-range score',
+       async () => {
+         const service = setUp([
+           new FakeScorer('first', 'First', async () => ({score: 0.25})),
+           new FakeScorer('second', 'Second', async () => ({score: 2026})),
+         ]);
+         mockBackendService.callAssistSpy.and.returnValue(fetched('answer'));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue({...CONFIG, selectedScorers: ['first', 'second']});
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.fetched).toBe('answer');
+         expect(result.scorerResults).toEqual([
+           {scorerId: 'first', displayName: 'First', score: 0.25},
+           {
+             scorerId: 'second',
+             displayName: 'Second',
+             score: 0,
+             error: 'Score 2026 is outside the 0.0 to 1.0 range.',
+             rowError: true,
+           },
+         ]);
+       });
 
     it('should record no scores when the response cannot be fetched',
        async () => {
