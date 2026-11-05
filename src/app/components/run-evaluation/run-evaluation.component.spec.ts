@@ -910,34 +910,76 @@ describe('RunEvaluationComponent', () => {
       expect(headers).not.toContain('Second Score');
     });
 
-    it('should show per-scorer error columns before any row is scored', () => {
-      select('first', 'second');
-      const fixture = TestBed.createComponent(RunEvaluationComponent);
-      const component = fixture.componentInstance;
-      fixture.detectChanges();
+    it('should attach errorKey and errorHeader to score columns without adding separate UI error columns',
+       () => {
+         select('first', 'second');
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
 
-      resultsSubject.next([]);
+         resultsSubject.next([]);
 
-      const keys = component.columns.map(c => c.key);
-      expect(keys).toContain('scoreError_first');
-      expect(keys).toContain('scoreError_second');
-      expect(component.columns.map(c => c.header)).toContain('Second Error');
-    });
+         const keys = component.columns.map(c => c.key);
+         expect(keys).not.toContain('scoreError_first');
+         expect(keys).not.toContain('scoreError_second');
+         expect(component.columns.map(c => c.header))
+             .not.toContain('Second Error');
 
-    it('should fill the error columns from the scored rows', () => {
-      select('first', 'second');
-      const fixture = TestBed.createComponent(RunEvaluationComponent);
-      const component = fixture.componentInstance;
-      fixture.detectChanges();
+         const firstCol = component.columns.find(c => c.key === 'score_first');
+         const secondCol =
+             component.columns.find(c => c.key === 'score_second');
+         expect(firstCol?.errorKey).toBe('scoreError_first');
+         expect(firstCol?.errorHeader).toBe('First Error');
+         expect(secondCol?.errorKey).toBe('scoreError_second');
+         expect(secondCol?.errorHeader).toBe('Second Error');
+       });
 
-      resultsSubject.next([rowWith([
-        {scorerId: 'first', displayName: 'First', score: 0.25},
-        {scorerId: 'second', displayName: 'Second', score: 0, error: 'boom'},
-      ])]);
+    it('should collect score and error separately and leave score blank when an error is present',
+       () => {
+         select('first', 'second');
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
 
-      expect(component.displayResults[0]['scoreError_second']).toBe('boom');
-      expect(component.displayResults[0]['scoreError_first']).toBe('');
-    });
+         resultsSubject.next([rowWith([
+           {scorerId: 'first', displayName: 'First', score: 0.25},
+           {scorerId: 'second', displayName: 'Second', score: 0, error: 'boom'},
+         ])]);
+
+         expect(component.displayResults[0]['score_first']).toBe(0.25);
+         expect(component.displayResults[0]['scoreError_first']).toBe('');
+         expect(component.displayResults[0]['score_second']).toBe('');
+         expect(component.displayResults[0]['scoreError_second']).toBe('boom');
+       });
+
+    it('should render the error in the score column in the UI when an error is not empty',
+       () => {
+         select('first', 'second');
+         resultsSubject.next([rowWith([
+           {scorerId: 'first', displayName: 'First', score: 0.85},
+           {scorerId: 'second', displayName: 'Second', score: 0, error: 'boom'},
+         ])]);
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         component.step = 3;
+         fixture.detectChanges();
+
+         const headers =
+             Array.from(fixture.nativeElement.querySelectorAll('th'))
+                 .map(th => (th as HTMLElement).textContent?.trim());
+         expect(headers).toContain('First Score');
+         expect(headers).toContain('Second Score');
+         expect(headers).not.toContain('First Error');
+         expect(headers).not.toContain('Second Error');
+
+         const secondScoreIndex = headers.indexOf('Second Score');
+         const cells = Array.from(
+             fixture.nativeElement.querySelectorAll('tbody tr td')) as
+             HTMLElement[];
+         const secondScoreCell = cells[secondScoreIndex];
+         expect(secondScoreCell.textContent?.trim()).toBe('boom');
+         expect(secondScoreCell.querySelector('.text-red-600')).not.toBeNull();
+       });
 
     it('should leave the score cell blank when the scorer failed', () => {
       select('first', 'second');

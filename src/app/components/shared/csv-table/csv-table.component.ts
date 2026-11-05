@@ -31,6 +31,17 @@ export interface ColumnDef {
   type?: 'text'|'markdown'|'number'|'score'|'delta'|'link';
   hrefKey?: string;
   linkText?: string;
+  /**
+   * Row key holding an error message for this column (used by `score` columns).
+   * When non-empty on a row, the UI renders the error in this column instead
+   * of `row[key]`, while CSV export writes it under `errorHeader`.
+   */
+  errorKey?: string;
+  /**
+   * CSV column header for `errorKey` when exported. Kept separate in the CSV
+   * even though the UI merges the error into this column.
+   */
+  errorHeader?: string;
   truncate?: boolean;
   width?: string;
   tooltip?: string;
@@ -76,6 +87,9 @@ export class CsvTableComponent implements OnChanges {
         exportedRow[col.header] = col.type === 'link' && col.hrefKey ?
             row[col.hrefKey] :
             row[col.key];
+        if (col.errorHeader && col.errorKey) {
+          exportedRow[col.errorHeader] = row[col.errorKey] ?? '';
+        }
       }
       if ('thoughts' in row) {
         exportedRow['Thoughts'] = row.thoughts || '';

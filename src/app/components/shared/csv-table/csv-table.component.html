@@ -109,9 +109,23 @@
 
             <!-- Score Type -->
             <div *ngIf="col.type === 'score'" class="font-medium">
-              <span [ngClass]="scoreClass(row[col.key])">
-                {{ row[col.key] }}
-              </span>
+              <ng-container *ngIf="col.errorKey && row[col.errorKey]; else scoreValue">
+                <span class="text-red-600 whitespace-pre-wrap break-words">{{
+                  !isExpanded(i, col.key) ? truncate(row[col.errorKey]) : row[col.errorKey]
+                }}</span>
+                <button
+                  *ngIf="row[col.errorKey]?.length > 100"
+                  (click)="toggleExpand(i, col.key)"
+                  class="block mt-1 px-1.5 py-0.5 border border-gray-300 text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  {{ isExpanded(i, col.key) ? "Show less" : "Show more" }}
+                </button>
+              </ng-container>
+              <ng-template #scoreValue>
+                <span [ngClass]="scoreClass(row[col.key])">
+                  {{ row[col.key] }}
+                </span>
+              </ng-template>
             </div>
 
             <!-- Delta Type -->

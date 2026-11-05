@@ -173,26 +173,22 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
   /**
    * Rebuilds the table columns from the scorers selected in the configuration.
    * Runs only when that selection changes, so the columns stay fixed for the
-   * whole run instead of shifting as rows arrive. Each score column is paired
-   * with its error column up front for the same reason.
+   * whole run instead of shifting as rows arrive. Each score column also
+   * carries its error key and CSV header so errors render inline in the UI
+   * while still exporting as a separate column in the CSV.
    * @param selectedIds The scorer ids selected in the configuration.
    */
   private updateColumns(selectedIds?: readonly string[]) {
     this.scorerColumns = this.scorerRegistry.resolveAll(selectedIds);
     this.allColumns = [
       ...BASE_COLUMNS,
-      ...this.scorerColumns.flatMap((scorer): ColumnDef[] => [
-        {
-          header: scoreColumnHeader(scorer.displayName),
-          key: scoreKey(scorer.id),
-          type: 'score'
-        },
-        {
-          header: scoreErrorColumnHeader(scorer.displayName),
-          key: scoreErrorKey(scorer.id),
-          truncate: true
-        },
-      ]),
+      ...this.scorerColumns.map((scorer): ColumnDef => ({
+        header: scoreColumnHeader(scorer.displayName),
+        key: scoreKey(scorer.id),
+        errorHeader: scoreErrorColumnHeader(scorer.displayName),
+        errorKey: scoreErrorKey(scorer.id),
+        type: 'score',
+      })),
       TRACE_COLUMN,
     ];
   }

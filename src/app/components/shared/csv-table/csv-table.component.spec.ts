@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-import {TestBed} from '@angular/core/testing';
+import {ComponentFixture, TestBed} from '@angular/core/testing';
 
 import {CsvService} from '../../../services/csv.service';
 
 import {CsvTableComponent} from './csv-table.component';
 
 describe('CsvTableComponent', () => {
+  let fixture: ComponentFixture<CsvTableComponent>;
   let component: CsvTableComponent;
   let exportCSV: jasmine.Spy;
 
@@ -30,7 +31,8 @@ describe('CsvTableComponent', () => {
       imports: [CsvTableComponent],
       providers: [{provide: CsvService, useValue: {exportCSV}}],
     });
-    component = TestBed.createComponent(CsvTableComponent).componentInstance;
+    fixture = TestBed.createComponent(CsvTableComponent);
+    component = fixture.componentInstance;
     component.columns = [{header: 'Query', key: 'query'}];
   });
 
@@ -66,6 +68,86 @@ describe('CsvTableComponent', () => {
          component.exportResults();
 
          expect('Agent ID' in exportedRows()[0]).toBeFalse();
+       });
+
+    it('should export score and error as separate CSV columns when errorHeader and errorKey are set',
+       () => {
+         component.columns = [
+           {header: 'Query', key: 'query'},
+           {
+             header: 'First Score',
+             key: 'score_first',
+             errorHeader: 'First Error',
+             errorKey: 'scoreError_first',
+             type: 'score',
+           },
+         ];
+         component.data = [
+           {query: 'q1', score_first: 0.9, scoreError_first: ''},
+           {query: 'q2', score_first: '', scoreError_first: 'boom'},
+         ];
+
+         component.exportResults();
+
+         expect(exportedRows()).toEqual([
+           {'Query': 'q1', 'First Score': 0.9, 'First Error': ''},
+           {'Query': 'q2', 'First Score': '', 'First Error': 'boom'},
+         ]);
+       });
+  });
+
+  describe('score column with inline error', () => {
+    beforeEach(() => {
+      component.columns = [
+        {
+          header: 'First Score',
+          key: 'score_first',
+          errorHeader: 'First Error',
+          errorKey: 'scoreError_first',
+          type: 'score',
+        },
+      ];
+    });
+
+    it('should render the score when error is empty and the error when error is not empty',
+       () => {
+         component.data = [
+           {score_first: 0.9, scoreError_first: ''},
+           {score_first: '', scoreError_first: 'Rate limit exceeded'},
+         ];
+         fixture.detectChanges();
+
+         const cells = Array.from(
+             fixture.nativeElement.querySelectorAll('tbody tr td')) as
+             HTMLElement[];
+         expect(cells.length).toBe(2);
+         expect(cells[0].textContent?.trim()).toBe('0.9');
+         expect(cells[0].querySelector('.text-green-600')).not.toBeNull();
+
+         expect(cells[1].textContent?.trim()).toBe('Rate limit exceeded');
+         expect(cells[1].querySelector('.text-red-600')).not.toBeNull();
+       });
+
+    it('should truncate long error messages in the score column and toggle expansion',
+       () => {
+         const longError = 'E'.repeat(120);
+         component.data = [{score_first: '', scoreError_first: longError}];
+         fixture.detectChanges();
+
+         const cell = fixture.nativeElement.querySelector('tbody tr td') as
+             HTMLElement;
+         const span = cell.querySelector('span.text-red-600') as HTMLElement;
+         const button = cell.querySelector('button') as HTMLButtonElement;
+
+         expect(span.textContent).toBe('E'.repeat(100) + '...');
+         expect(button).not.toBeNull();
+         expect(button.textContent?.trim()).toBe('Show more');
+
+         button.click();
+         fixture.detectChanges();
+
+         expect(span.textContent).toBe(longError);
+         expect(button.textContent?.trim()).toBe('Show less');
        });
   });
 
