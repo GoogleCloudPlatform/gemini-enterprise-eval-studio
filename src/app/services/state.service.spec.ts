@@ -17,6 +17,7 @@
 import {fakeAsync, tick} from '@angular/core/testing';
 
 import {AppConfig} from '../models/app-config.model';
+import {ConnectorOption} from '../models/connector.model';
 
 import {StateService} from './state.service';
 
@@ -27,6 +28,13 @@ const STORAGE_DEBOUNCE_MS = 300;
 
 const AGENT_PATH =
     'projects/p/locations/global/collections/default_collection/engines/e/assistants/default_assistant/agents/support-bot';
+
+const JIRA: ConnectorOption = {
+  id: 'JIRA',
+  displayName: 'Jira',
+  entityIds: ['jira-issues'],
+  searchableDataStoreIds: ['jira-issues'],
+};
 
 describe('StateService', () => {
   beforeEach(() => {
@@ -66,5 +74,30 @@ describe('StateService', () => {
 
     expect(config.projectId).toBe('project');
     expect(config.selectedAgent).toBe('');
+  });
+
+  describe('connectors', () => {
+    it('should return no connectors before any are set', () => {
+      expect(new StateService().getConnectors('engineA')).toBeUndefined();
+    });
+
+    it('should return the connectors set for the same engine', () => {
+      const service = new StateService();
+      service.setConnectors('engineA', [JIRA]);
+      expect(service.getConnectors('engineA')).toEqual([JIRA]);
+    });
+
+    it('should not return connectors set for another engine', () => {
+      const service = new StateService();
+      service.setConnectors('engineA', [JIRA]);
+      expect(service.getConnectors('engineB')).toBeUndefined();
+    });
+
+    it('should replace the connectors when another engine sets them', () => {
+      const service = new StateService();
+      service.setConnectors('engineA', [JIRA]);
+      service.setConnectors('engineB', []);
+      expect(service.getConnectors('engineA')).toBeUndefined();
+    });
   });
 });

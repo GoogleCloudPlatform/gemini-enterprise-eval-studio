@@ -22,7 +22,8 @@ import {Subject} from 'rxjs';
 import {takeUntil} from 'rxjs/operators';
 
 import {Agent, agentDisplayName} from '../../../models/agent.model';
-import {AppConfig, CollectionComponent, DataStoreComponent, Engine, WidgetConfigResponse} from '../../../models/app-config.model';
+import {AppConfig, CollectionComponent, ConnectorAuthStateValue, DataStoreComponent, Engine, WidgetConfigResponse} from '../../../models/app-config.model';
+import {ConnectorOption, WEB_SEARCH_CONNECTOR_ID} from '../../../models/connector.model';
 import {ScorerSelection} from '../../../scoring/scorer-selection';
 import {listAutoRaterModels} from '../../../scoring/scorers/auto-rater.scorer';
 import {AgentListService, AgentListState} from '../../../services/agent-list.service';
@@ -33,16 +34,6 @@ import {StateService} from '../../../services/state.service';
 import {InfoTooltipComponent} from '../../shared/info-tooltip/info-tooltip.component';
 import {ScoringSetupComponent} from '../../shared/scoring-setup/scoring-setup.component';
 
-
-/**
- * Represents a connector option for selection in the UI.
- */
-export interface ConnectorOption {
-  id: string;
-  displayName: string;
-  dataSource?: string;
-  entityIds: string[];
-}
 
 interface EnginesResponse {
   engines?: Engine[];
@@ -109,6 +100,32 @@ const DATA_SOURCE_DISPLAY_NAMES: Record<string, string> =
 function asSentence(message: string): string {
   const trimmed = message.trim();
   return /[.!?]$/.test(trimmed) ? trimmed : `${trimmed}.`;
+}
+
+/** Auth states whose connector can serve search requests for the user. */
+const SEARCHABLE_AUTH_STATES: ReadonlySet<ConnectorAuthStateValue> =
+    new Set(['AUTHORIZED', 'NO_AUTH', 'ACTIONS_DISABLED']);
+
+/**
+ * Returns whether a connector's data stores can be searched by the current
+ * user.
+ *
+ * A component without `connectorAuthState` involves no end-user
+ * authorization, so it is searchable. Otherwise only `AUTHORIZED`, `NO_AUTH`
+ * and `ACTIONS_DISABLED` (search works, actions do not) are searchable. A
+ * missing `authState` is the proto default `AUTH_STATE_UNSPECIFIED`, which the
+ * API returns for a connector the user has not signed in to; it and `EXPIRED`
+ * are not searchable. Data stores of connectors that are not searchable are
+ * kept out of the per-row lookup so that a row naming them is flagged
+ * `(not found)` rather than looking like a grounded run.
+ */
+function isAuthorized(component: CollectionComponent): boolean {
+  const authState = component.connectorAuthState;
+  if (authState == null) {
+    return true;
+  }
+  return authState.authState != null &&
+      SEARCHABLE_AUTH_STATES.has(authState.authState);
 }
 
 /**
@@ -434,36 +451,52 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
 
   fetchConnectorsForSelectedEngine() {
     const engine = this.getSelectedEngine();
-    if (!this.config.projectId || !this.config.selectedEngine) {
-      this.connectors = this.buildFallbackConnectors(engine);
-      this.validateAndSyncSelectedDataStores();
+    const requestedEngine = this.config.selectedEngine;
+    if (!this.config.projectId || !requestedEngine) {
+      this.showConnectors(this.buildFallbackConnectors(engine));
       return;
     }
 
+    // A slow response for a previously selected engine must not replace the
+    // connectors of the engine selected now.
+    const isStale = () => this.config.selectedEngine !== requestedEngine;
     this.evalBackendService.fetchWidgetConfig(
         this.config.projectId,
         this.config.region,
-        this.config.selectedEngine,
+        requestedEngine,
         this.config
     ).then((widgetData) => {
-      if (widgetData) {
-        const parsed = this.parseWidgetDataForConnectors(widgetData, engine);
-        if (parsed.length > 0) {
-          this.connectors = parsed;
-        } else {
-          this.connectors = this.buildFallbackConnectors(engine);
-        }
+      if (isStale()) return;
+      const parsed =
+          widgetData ? this.parseWidgetDataForConnectors(widgetData, engine) : [];
+      if (parsed.length > 0) {
+        this.showConnectors(parsed);
+        this.stateService.setConnectors(requestedEngine, parsed);
       } else {
-        this.connectors = this.buildFallbackConnectors(engine);
+        this.showConnectors(this.buildFallbackConnectors(engine));
       }
-      this.validateAndSyncSelectedDataStores();
       this.cdr.detectChanges();
     }).catch((error) => {
+      if (isStale()) return;
       console.error('Error fetching widget config:', error);
-      this.connectors = this.buildFallbackConnectors(engine);
-      this.validateAndSyncSelectedDataStores();
+      this.showConnectors(this.buildFallbackConnectors(engine));
       this.cdr.detectChanges();
     });
+  }
+
+  /**
+   * Shows `connectors` in the dropdown.
+   *
+   * Only lists parsed from a widget config response are also shared through
+   * `StateService` (by the caller): a fallback list has no auth states, so
+   * sharing it would make unauthorized connectors searchable per row, and could
+   * replace a parsed list another form already shared for the same engine.
+   *
+   * @param connectors The connectors to show.
+   */
+  private showConnectors(connectors: ConnectorOption[]) {
+    this.connectors = connectors;
+    this.validateAndSyncSelectedDataStores();
   }
 
   /**
@@ -532,29 +565,43 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
         component.dataSource || component.id);
   }
 
-  private upsertConnector(
+  /**
+   * Adds `candidate` to `connectorsMap`, merging its ids into any option that
+   * already has the same id.
+   */
+  private mergeConnector(
       connectorsMap: Map<string, ConnectorOption>,
-      meta: {key: string; displayName: string; dataSource?: string},
-      entityIds: string[], fallbackDataSource?: string): void {
-    const existing = connectorsMap.get(meta.key);
-    if (existing) {
-      for (const id of entityIds) {
-        if (!existing.entityIds.includes(id)) {
-          existing.entityIds.push(id);
-        }
-      }
-    } else {
-      const option: ConnectorOption = {
-        id: meta.key,
-        displayName: meta.displayName,
-        entityIds: [...entityIds]
-      };
-      const ds = meta.dataSource || fallbackDataSource;
-      if (ds) {
-        option.dataSource = ds;
-      }
-      connectorsMap.set(meta.key, option);
+      candidate: ConnectorOption): void {
+    const existing = connectorsMap.get(candidate.id);
+    if (existing == null) {
+      connectorsMap.set(candidate.id, candidate);
+      return;
     }
+    for (const id of candidate.entityIds) {
+      if (!existing.entityIds.includes(id)) {
+        existing.entityIds.push(id);
+      }
+    }
+    for (const id of candidate.searchableDataStoreIds) {
+      if (!existing.searchableDataStoreIds.includes(id)) {
+        existing.searchableDataStoreIds.push(id);
+      }
+    }
+  }
+
+  /** Builds the option for a data store that belongs to the engine itself. */
+  private engineDataStoreConnector(dataStoreId: string): ConnectorOption {
+    const meta = this.inferConnectorMetadata(dataStoreId);
+    const option: ConnectorOption = {
+      id: meta.key,
+      displayName: meta.displayName,
+      entityIds: [dataStoreId],
+      searchableDataStoreIds: [dataStoreId],
+    };
+    if (meta.dataSource) {
+      option.dataSource = meta.dataSource;
+    }
+    return option;
   }
 
   parseWidgetDataForConnectors(widgetData: WidgetConfigResponse, engine: Engine | undefined): ConnectorOption[] {
@@ -568,11 +615,23 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
               .map((ds: DataStoreComponent) => ds.id)
               .filter((id: string | undefined): id is string => !!id);
 
+          // A connector without data stores (such as one awaiting
+          // authorization) is still listed under its own id, but that id is
+          // a placeholder that cannot be searched.
           const effectiveIds = entityIds.length > 0 ? entityIds : (component.id ? [component.id] : []);
           effectiveIds.forEach(id => coveredEntityIds.add(id));
           const meta = this.inferConnectorMetadata(component);
-          this.upsertConnector(
-              connectorsMap, meta, effectiveIds, component.dataSource);
+          const option: ConnectorOption = {
+            id: meta.key,
+            displayName: meta.displayName,
+            entityIds: [...effectiveIds],
+            searchableDataStoreIds: isAuthorized(component) ? entityIds : [],
+          };
+          const dataSource = meta.dataSource || component.dataSource;
+          if (dataSource) {
+            option.dataSource = dataSource;
+          }
+          this.mergeConnector(connectorsMap, option);
         }
       }
     }
@@ -580,17 +639,17 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     if (engine && engine.dataStoreIds) {
       for (const ds of engine.dataStoreIds) {
         if (!coveredEntityIds.has(ds)) {
-          const meta = this.inferConnectorMetadata(ds);
-          this.upsertConnector(connectorsMap, meta, [ds]);
+          this.mergeConnector(connectorsMap, this.engineDataStoreConnector(ds));
         }
       }
     }
 
     const list = Array.from(connectorsMap.values());
     list.push({
-      id: 'Web Search',
+      id: WEB_SEARCH_CONNECTOR_ID,
       displayName: 'Web Search',
-      entityIds: []
+      entityIds: [],
+      searchableDataStoreIds: [],
     });
 
     return list;
@@ -600,15 +659,15 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
     const connectorsMap = new Map<string, ConnectorOption>();
     if (engine && engine.dataStoreIds) {
       engine.dataStoreIds.forEach(ds => {
-        const meta = this.inferConnectorMetadata(ds);
-        this.upsertConnector(connectorsMap, meta, [ds]);
+        this.mergeConnector(connectorsMap, this.engineDataStoreConnector(ds));
       });
     }
     const list = Array.from(connectorsMap.values());
     list.push({
-      id: 'Web Search',
+      id: WEB_SEARCH_CONNECTOR_ID,
       displayName: 'Web Search',
-      entityIds: []
+      entityIds: [],
+      searchableDataStoreIds: [],
     });
     return list;
   }
@@ -624,7 +683,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
    * Checks if a connector is selected (all of its entityIds must be in selectedDataStores).
    */
   isConnectorSelected(connector: ConnectorOption): boolean {
-    if (connector.id === 'Web Search') {
+    if (connector.id === WEB_SEARCH_CONNECTOR_ID) {
       return this.config.enableWebSearch;
     }
     if (!this.config.selectedDataStores || connector.entityIds.length === 0) {
@@ -637,7 +696,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
    * Toggles the selection of a connector and all its entityIds.
    */
   toggleConnector(connector: ConnectorOption) {
-    if (connector.id === 'Web Search') {
+    if (connector.id === WEB_SEARCH_CONNECTOR_ID) {
       this.config.enableWebSearch = !this.config.enableWebSearch;
     } else {
       if (!this.config.selectedDataStores) {

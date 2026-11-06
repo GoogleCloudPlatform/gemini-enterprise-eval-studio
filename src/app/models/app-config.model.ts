@@ -60,11 +60,25 @@ export interface DataStoreComponent {
   displayName?: string;
 }
 
+/**
+ * Authorization state of a connector, as returned by the widget config API.
+ * `AUTH_STATE_UNSPECIFIED` is the proto default, so REST responses usually
+ * omit `authState` instead of sending it.
+ */
+export type ConnectorAuthStateValue =
+    'AUTH_STATE_UNSPECIFIED'|'AUTHORIZED'|'EXPIRED'|'ACTIONS_DISABLED'|'NO_AUTH';
+
+/** Read-only auth state of a connector in a collection component. */
+export interface ConnectorAuthState {
+  authState?: ConnectorAuthStateValue;
+  authorizationUri?: string;
+}
+
 export interface CollectionComponent {
   id?: string;
   displayName?: string;
   dataSource?: string;
-  connectorAuthState?: any;
+  connectorAuthState?: ConnectorAuthState;
   federatedSearchConnectorAuthUri?: string;
   dataStoreComponents?: DataStoreComponent[];
 }

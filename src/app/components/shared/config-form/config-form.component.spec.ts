@@ -19,7 +19,7 @@ import {ComponentFixture, TestBed, fakeAsync, tick} from '@angular/core/testing'
 import {BehaviorSubject, of, throwError} from 'rxjs';
 
 import {Agent} from '../../../models/agent.model';
-import {AppConfig, Engine} from '../../../models/app-config.model';
+import {AppConfig, ConnectorAuthState, Engine, WidgetConfigResponse} from '../../../models/app-config.model';
 import {AuthService} from '../../../services/auth.service';
 import {EvalBackendService} from '../../../services/eval-backend.service';
 import {StateService} from '../../../services/state.service';
@@ -55,7 +55,7 @@ describe('ConfigFormComponent', () => {
 
     mockStateService = jasmine.createSpyObj(
         'StateService',
-        ['setConfig', 'setEngines', 'getCurrentConfig', 'setErrorMessage'], {
+        ['setConfig', 'setEngines', 'getCurrentConfig', 'setErrorMessage', 'setConnectors'], {
           config$: configSubject.asObservable(),
           engines$: enginesSubject.asObservable(),
           errorMessage$: errorMessageSubject.asObservable()
@@ -876,7 +876,7 @@ describe('ConfigFormComponent', () => {
       const fixture = TestBed.createComponent(ConfigFormComponent);
       const component = fixture.componentInstance;
 
-      const mockWidgetData = {
+      const mockWidgetData: WidgetConfigResponse = {
         collectionComponents: [
           {
             id: 'jira-connector',
@@ -900,8 +900,11 @@ describe('ConfigFormComponent', () => {
       expect(parsed[0].id).toBe('JIRA');
       expect(parsed[0].displayName).toBe('Jira Cloud');
       expect(parsed[0].entityIds).toEqual(['jira-issues-123', 'jira-wiki-456']);
+      expect(parsed[0].searchableDataStoreIds).toEqual(['jira-issues-123', 'jira-wiki-456']);
       expect(parsed[1].id).toBe('native-ds-789');
+      expect(parsed[1].searchableDataStoreIds).toEqual(['native-ds-789']);
       expect(parsed[2].id).toBe('Web Search');
+      expect(parsed[2].searchableDataStoreIds).toEqual([]);
     });
 
     it('should group ServiceNow collection components under a single SERVICENOW connector option',
@@ -909,7 +912,7 @@ describe('ConfigFormComponent', () => {
          const fixture = TestBed.createComponent(ConfigFormComponent);
          const component = fixture.componentInstance;
 
-         const mockWidgetData = {
+         const mockWidgetData: WidgetConfigResponse = {
            collectionComponents: [
              {
                id: 'Servicenow_hr',
@@ -962,7 +965,8 @@ describe('ConfigFormComponent', () => {
       const connectorOption = {
         id: 'jira-connector',
         displayName: 'Jira Cloud',
-        entityIds: ['jira-issues-123', 'jira-wiki-456']
+        entityIds: ['jira-issues-123', 'jira-wiki-456'],
+        searchableDataStoreIds: ['jira-issues-123', 'jira-wiki-456']
       };
 
       component.config.selectedDataStores = [];
@@ -982,7 +986,7 @@ describe('ConfigFormComponent', () => {
       component.config.region = 'global';
       component.config.selectedEngine = 'engine1';
 
-      const mockWidgetData = {
+      const mockWidgetData: WidgetConfigResponse = {
         collectionComponents: [
           {
             id: 'jira-connector',
@@ -1003,7 +1007,62 @@ describe('ConfigFormComponent', () => {
       expect(mockEvalBackendService.fetchWidgetConfigSpy).toHaveBeenCalledWith(
           'project', 'global', 'engine1', component.config);
       expect(component.connectors.length).toBe(2); // jira-connector + Web Search
+      expect(mockStateService.setConnectors)
+          .toHaveBeenCalledWith('engine1', component.connectors);
     }));
+
+    it('should drop a widget config response for an engine that is no longer selected',
+       fakeAsync(() => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+         component.config.projectId = 'project';
+         component.config.region = 'global';
+         component.config.selectedEngine = 'engineA';
+         let resolveA: (data: unknown) => void = () => {};
+         mockEvalBackendService.fetchWidgetConfigSpy.and.returnValue(
+             new Promise(resolve => {
+               resolveA = resolve;
+             }));
+         component.fetchConnectorsForSelectedEngine();
+
+         // The user picks engine B before engine A's response arrives.
+         component.config.selectedEngine = 'engineB';
+         mockStateService.setConnectors.calls.reset();
+         resolveA({
+           collectionComponents: [{
+             id: 'jira-connector',
+             displayName: 'Jira Cloud',
+             dataStoreComponents: [{id: 'engine-a-ds'}]
+           }]
+         });
+         tick();
+
+         expect(mockStateService.setConnectors).not.toHaveBeenCalled();
+         expect(component.connectors.flatMap(c => c.entityIds))
+             .not.toContain('engine-a-ds');
+       }));
+
+    it('should drop a widget config failure for an engine that is no longer selected',
+       fakeAsync(() => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+         component.config.projectId = 'project';
+         component.config.region = 'global';
+         component.config.selectedEngine = 'engineA';
+         let rejectA: (error: Error) => void = () => {};
+         mockEvalBackendService.fetchWidgetConfigSpy.and.returnValue(
+             new Promise((unusedResolve, reject) => {
+               rejectA = reject;
+             }));
+         component.fetchConnectorsForSelectedEngine();
+
+         component.config.selectedEngine = 'engineB';
+         mockStateService.setConnectors.calls.reset();
+         rejectA(new Error('slow failure'));
+         tick();
+
+         expect(mockStateService.setConnectors).not.toHaveBeenCalled();
+       }));
 
     it('should fetch connectors using full resource path when selectedEngine starts with projects/',
        fakeAsync(() => {
@@ -1025,18 +1084,85 @@ describe('ConfigFormComponent', () => {
 
 
 
+    it('should treat connector auth states as the widget config API reports them', () => {
+      const fixture = TestBed.createComponent(ConfigFormComponent);
+      const component = fixture.componentInstance;
+      const component_ = (id: string, connectorAuthState?: ConnectorAuthState) => ({
+        id,
+        displayName: id,
+        connectorAuthState,
+        dataStoreComponents: [{id: `${id}-ds`}]
+      });
+      const mockWidgetData: WidgetConfigResponse = {
+        collectionComponents: [
+          component_('no-auth-state'),
+          component_('unspecified', {authorizationUri: 'https://auth.example.com'}),
+          component_('authorized', {authState: 'AUTHORIZED'}),
+          component_('no-auth', {authState: 'NO_AUTH'}),
+          component_('actions-disabled', {authState: 'ACTIONS_DISABLED'}),
+          component_('expired', {authState: 'EXPIRED'}),
+        ]
+      };
+
+      const parsed = component.parseWidgetDataForConnectors(mockWidgetData, undefined);
+      const searchable = (id: string) =>
+          parsed.find(c => c.entityIds.includes(`${id}-ds`))
+              ?.searchableDataStoreIds;
+
+      expect(searchable('no-auth-state')).toEqual(['no-auth-state-ds']);
+      expect(searchable('unspecified')).toEqual([]);
+      expect(searchable('authorized')).toEqual(['authorized-ds']);
+      expect(searchable('no-auth')).toEqual(['no-auth-ds']);
+      expect(searchable('actions-disabled')).toEqual(['actions-disabled-ds']);
+      expect(searchable('expired')).toEqual([]);
+    });
+
+    it('should not share the fallback connectors when the widget config is unavailable',
+       fakeAsync(() => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+         component.config.projectId = 'project';
+         component.config.region = 'global';
+         component.config.selectedEngine = 'engine1';
+         mockStateService.setConnectors.calls.reset();
+         mockEvalBackendService.fetchWidgetConfigSpy.and.returnValue(
+             Promise.resolve(null));
+
+         component.fetchConnectorsForSelectedEngine();
+         tick();
+
+         expect(component.connectors.length).toBeGreaterThan(0);
+         expect(mockStateService.setConnectors).not.toHaveBeenCalled();
+       }));
+
+    it('should not share the fallback connectors when the widget config request fails',
+       fakeAsync(() => {
+         const fixture = TestBed.createComponent(ConfigFormComponent);
+         const component = fixture.componentInstance;
+         component.config.projectId = 'project';
+         component.config.region = 'global';
+         component.config.selectedEngine = 'engine1';
+         mockStateService.setConnectors.calls.reset();
+         mockEvalBackendService.fetchWidgetConfigSpy.and.returnValue(
+             Promise.reject(new Error('403')));
+
+         component.fetchConnectorsForSelectedEngine();
+         tick();
+
+         expect(mockStateService.setConnectors).not.toHaveBeenCalled();
+       }));
+
     it('should include all widget connectors without duplicate entity IDs from engine fallback', () => {
       const fixture = TestBed.createComponent(ConfigFormComponent);
       const component = fixture.componentInstance;
 
-      const mockWidgetData = {
+      const mockWidgetData: WidgetConfigResponse = {
         collectionComponents: [
           {
             id: 'jira-connector',
             displayName: 'Jira Cloud',
             federatedSearchConnectorAuthUri: 'https://auth.example.com/jira',
             connectorAuthState: {
-              authState: 'NOT_AUTHORIZED',
               authorizationUri: 'https://auth.example.com/jira'
             },
             dataStoreComponents: [{id: 'jira-issues-123'}]
@@ -1062,7 +1188,9 @@ describe('ConfigFormComponent', () => {
 
       expect(parsed.length).toBe(4); // JIRA + CONFLUENCE + native-ds-789 + Web Search
       expect(parsed[0].id).toBe('JIRA');
+      expect(parsed[0].searchableDataStoreIds).toEqual([]);
       expect(parsed[1].id).toBe('CONFLUENCE');
+      expect(parsed[1].searchableDataStoreIds).toEqual(['confluence-wiki-456']);
       expect(parsed[2].id).toBe('native-ds-789');
       expect(parsed[3].id).toBe('Web Search');
     });
@@ -1071,7 +1199,7 @@ describe('ConfigFormComponent', () => {
       const fixture = TestBed.createComponent(ConfigFormComponent);
       const component = fixture.componentInstance;
 
-      const mockWidgetData = {
+      const mockWidgetData: WidgetConfigResponse = {
         collectionComponents: [
           {
             id: 'notion-pages',
@@ -1107,6 +1235,10 @@ describe('ConfigFormComponent', () => {
       expect(parsed[0].id).toBe('NOTION');
       expect(parsed[0].displayName).toBe('Notion');
       expect(parsed[0].entityIds).toEqual(['notion-pages-ds-1', 'notion-db-ds-2', 'notion_extra_ds_3']);
+      // The EXPIRED component's data store is left out; the engine data store
+      // grouped under NOTION stays searchable.
+      expect(parsed[0].searchableDataStoreIds)
+          .toEqual(['notion-pages-ds-1', 'notion_extra_ds_3']);
       expect(parsed[1].id).toBe('Web Search');
     });
 
@@ -1114,14 +1246,13 @@ describe('ConfigFormComponent', () => {
       const fixture = TestBed.createComponent(ConfigFormComponent);
       const component = fixture.componentInstance;
 
-      const mockWidgetData = {
+      const mockWidgetData: WidgetConfigResponse = {
         collectionComponents: [
           {
             id: 'collections/eua_placeholder_NOTION',
             displayName: 'Notion',
             dataSource: 'NOTION',
             connectorAuthState: {
-              authState: 'NOT_AUTHORIZED',
               authorizationUri: 'https://auth.example.com/notion-auth'
             },
             dataStoreComponents: []
@@ -1139,6 +1270,7 @@ describe('ConfigFormComponent', () => {
       expect(parsed[0].id).toBe('NOTION');
       expect(parsed[0].displayName).toBe('Notion');
       expect(parsed[0].entityIds).toEqual(['collections/eua_placeholder_NOTION']);
+      expect(parsed[0].searchableDataStoreIds).toEqual([]);
     });
   });
 

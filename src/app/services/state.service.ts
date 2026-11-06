@@ -19,6 +19,7 @@ import {BehaviorSubject, Subject} from 'rxjs';
 import {debounceTime, map} from 'rxjs/operators';
 
 import {AppConfig, Engine} from '../models/app-config.model';
+import {ConnectorOption} from '../models/connector.model';
 import {ResultRow} from '../models/result-row.model';
 
 /**
@@ -110,6 +111,13 @@ export class StateService {
   /** Observable of the error message. */
   errorMessage$ = this.errorMessageSubject.asObservable();
 
+  /**
+   * The connectors of one engine, keyed by that engine so a list fetched for a
+   * previously selected engine is never read for another one.
+   */
+  private connectorsByEngine:
+      {engine: string, connectors: ConnectorOption[]}|null = null;
+
   /** Sets the current active tab. */
   setTab(tab: string) {
     this.currentTabSubject.next(tab);
@@ -151,6 +159,29 @@ export class StateService {
   /** Gets the currently fetched engines. */
   getEngines(): Engine[] {
     return structuredClone(this.enginesSubject.value);
+  }
+
+  /** Sets the connectors available on an engine. */
+  setConnectors(engine: string, connectors: ConnectorOption[]) {
+    this.connectorsByEngine = {
+      engine,
+      connectors: structuredClone(connectors),
+    };
+  }
+
+  /**
+   * Gets the connectors available on an engine.
+   *
+   * @param engine The engine resource name.
+   * @returns The connectors last set for `engine`, or `undefined` if none are
+   *     known for it: the list has not loaded, its widget config request
+   *     failed, or the stored list belongs to another engine.
+   */
+  getConnectors(engine: string): ConnectorOption[]|undefined {
+    if (this.connectorsByEngine?.engine !== engine) {
+      return undefined;
+    }
+    return structuredClone(this.connectorsByEngine.connectors);
   }
 }
 
