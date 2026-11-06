@@ -26,14 +26,26 @@ describe('proxy module', () => {
     auth_providers: [],
   };
 
+  function findRouteHandler(path: string) {
+    const router = createProxyRouter(mockConfig);
+    const route = router.stack.find(s => s.route?.path === path);
+    expect(route).toBeDefined();
+    return route!.route!.stack[0];
+  }
+
+  function stubOAuthRequest(responseData: unknown) {
+    const requestSpy =
+        jasmine.createSpy('request').and.resolveTo({data: responseData});
+    spyOn(google.auth, 'OAuth2').and.returnValue({
+      setCredentials: jasmine.createSpy('setCredentials'),
+      request: requestSpy,
+    } as unknown as InstanceType<typeof google.auth.OAuth2>);
+    return requestSpy;
+  }
+
   describe('/api/v1/assist', () => {
     it('should forward request to Discovery Engine with Bearer token and stream response',
        async () => {
-         const router = createProxyRouter(mockConfig);
-         const route =
-             router.stack.find(s => s.route?.path === '/api/v1/assist');
-         expect(route).toBeDefined();
-
          const headersMap = new Map<string, string>();
          headersMap.set('Content-Type', 'application/json');
 
@@ -79,7 +91,7 @@ describe('proxy module', () => {
            end: jasmine.createSpy('end'),
          } as unknown as Response;
 
-         await route!.route!.stack[0].handle(req, res, () => {});
+         await findRouteHandler('/api/v1/assist').handle(req, res, () => {});
 
          expect(mockFetch).toHaveBeenCalledWith(
              'https://us-central1-discoveryengine.googleapis.com/v1/projects/p1/locations/l1/collections/c1/engines/e1/assistants/default_assistant:streamAssist',
@@ -97,11 +109,6 @@ describe('proxy module', () => {
 
     it('should forward upstream error status and text when response is not OK',
        async () => {
-         const router = createProxyRouter(mockConfig);
-         const route =
-             router.stack.find(s => s.route?.path === '/api/v1/assist');
-         expect(route).toBeDefined();
-
          const headersMap = new Map<string, string>();
          headersMap.set('Content-Type', 'application/json');
 
@@ -143,21 +150,499 @@ describe('proxy module', () => {
            end: jasmine.createSpy('end'),
          } as unknown as Response;
 
-         await route!.route!.stack[0].handle(req, res, () => {});
+         await findRouteHandler('/api/v1/assist').handle(req, res, () => {});
 
          expect(mockFetch).toHaveBeenCalled();
          expect(statusSpy).toHaveBeenCalledWith(403);
          expect(sendSpy).toHaveBeenCalledWith('Forbidden');
+       });
+
+    it('routes eu requests to eu-discoveryengine.googleapis.com', async () => {
+      const headersMap = new Map<string, string>([
+        ['Content-Type', 'application/json'],
+      ]);
+      const mockFetch = spyOn(globalThis, 'fetch').and.resolveTo({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => headersMap.get(name) || null,
+          has: (name: string) => headersMap.has(name),
+        },
+        body: {
+          getReader: () => ({
+            read: async () => ({done: true, value: undefined}),
+          }),
+        },
+      } as unknown as globalThis.Response);
+      const enginePath =
+          'projects/p1/locations/eu/collections/default_collection/engines/e1';
+      const req = {
+        body: {
+          selectedEngine: enginePath,
+          region: 'eu',
+          body: {query: {text: 'hello'}},
+        },
+        session: {token: {access_token: 'mock-access-token'}},
+      } as unknown as Request;
+      const endSpy = jasmine.createSpy('end');
+      const res = {
+        status: jasmine.createSpy('status'),
+        setHeader: jasmine.createSpy('setHeader'),
+        write: jasmine.createSpy('write'),
+        end: endSpy,
+      } as unknown as Response;
+
+      await findRouteHandler('/api/v1/assist').handle(req, res, () => {});
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledWith(
+          `https://eu-discoveryengine.googleapis.com/v1/${enginePath}/assistants/default_assistant:streamAssist`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer mock-access-token',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({query: {text: 'hello'}}),
+          });
+      expect(endSpy).toHaveBeenCalled();
+    });
+
+    it('routes global requests to discoveryengine.googleapis.com', async () => {
+      const headersMap = new Map<string, string>([
+        ['Content-Type', 'application/json'],
+      ]);
+      const mockFetch = spyOn(globalThis, 'fetch').and.resolveTo({
+        ok: true,
+        status: 200,
+        headers: {
+          get: (name: string) => headersMap.get(name) || null,
+          has: (name: string) => headersMap.has(name),
+        },
+        body: {
+          getReader: () => ({
+            read: async () => ({done: true, value: undefined}),
+          }),
+        },
+      } as unknown as globalThis.Response);
+      const enginePath =
+          'projects/p1/locations/global/collections/default_collection/engines/e1';
+      const req = {
+        body: {
+          selectedEngine: enginePath,
+          region: 'global',
+          body: {query: {text: 'hello'}},
+        },
+        session: {token: {access_token: 'mock-access-token'}},
+      } as unknown as Request;
+      const endSpy = jasmine.createSpy('end');
+      const res = {
+        status: jasmine.createSpy('status'),
+        setHeader: jasmine.createSpy('setHeader'),
+        write: jasmine.createSpy('write'),
+        end: endSpy,
+      } as unknown as Response;
+
+      await findRouteHandler('/api/v1/assist').handle(req, res, () => {});
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledWith(
+          `https://discoveryengine.googleapis.com/v1/${enginePath}/assistants/default_assistant:streamAssist`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': 'Bearer mock-access-token',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({query: {text: 'hello'}}),
+          });
+      expect(endSpy).toHaveBeenCalled();
+    });
+  });
+
+  describe('/api/v1/score', () => {
+    function createScoreResponse() {
+      const sendSpy = jasmine.createSpy('send');
+      const statusSpy =
+          jasmine.createSpy('status').and.returnValue({send: sendSpy});
+      const jsonSpy = jasmine.createSpy('json');
+      const res = {status: statusSpy, json: jsonSpy} as unknown as Response;
+      return {res, statusSpy, sendSpy, jsonSpy};
+    }
+
+    it('routes global requests to aiplatform.googleapis.com', async () => {
+      const scorePayload = {
+        candidates: [{content: {parts: [{text: '0.9'}]}}],
+      };
+      const requestSpy = stubOAuthRequest(scorePayload);
+      const {res, jsonSpy} = createScoreResponse();
+      const req = {
+        body: {
+          projectId: 'my-project',
+          region: 'global',
+          model: 'gemini-3.5-flash',
+          body: {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]},
+        },
+        session: {token: {access_token: 'mock-access-token'}},
+      } as unknown as Request;
+
+      await findRouteHandler('/api/v1/score').handle(req, res, () => {});
+
+      expect(requestSpy).toHaveBeenCalledTimes(1);
+      expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+        url:
+            'https://aiplatform.googleapis.com/v1/projects/my-project/locations/global/publishers/google/models/gemini-3.5-flash:generateContent',
+        method: 'POST',
+        data: {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]},
+        headers: jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+      }));
+      expect(jsonSpy).toHaveBeenCalledTimes(1);
+      expect(jsonSpy).toHaveBeenCalledWith(scorePayload);
+    });
+
+    it('routes eu multi-regional requests to aiplatform.eu.rep.googleapis.com',
+       async () => {
+         const scorePayload = {
+           candidates: [{content: {parts: [{text: '0.85'}]}}],
+         };
+         const requestSpy = stubOAuthRequest(scorePayload);
+         const {res, jsonSpy} = createScoreResponse();
+         const req = {
+           body: {
+             projectId: 'my-project',
+             region: 'eu',
+             model: 'gemini-3.5-flash',
+             body: {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]},
+           },
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/score').handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               'https://aiplatform.eu.rep.googleapis.com/v1/projects/my-project/locations/eu/publishers/google/models/gemini-3.5-flash:generateContent',
+           method: 'POST',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(scorePayload);
+       });
+
+    it('routes us multi-regional requests to aiplatform.us.rep.googleapis.com',
+       async () => {
+         const scorePayload = {
+           candidates: [{content: {parts: [{text: '0.75'}]}}],
+         };
+         const requestSpy = stubOAuthRequest(scorePayload);
+         const {res, jsonSpy} = createScoreResponse();
+         const req = {
+           body: {
+             projectId: 'my-project',
+             region: 'us',
+             model: 'gemini-3.5-flash',
+             body: {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]},
+           },
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/score').handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               'https://aiplatform.us.rep.googleapis.com/v1/projects/my-project/locations/us/publishers/google/models/gemini-3.5-flash:generateContent',
+           method: 'POST',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(scorePayload);
+       });
+
+    it('routes single-region requests to {region}-aiplatform.googleapis.com',
+       async () => {
+         const scorePayload = {
+           candidates: [{content: {parts: [{text: '1.0'}]}}],
+         };
+         const requestSpy = stubOAuthRequest(scorePayload);
+         const {res, jsonSpy} = createScoreResponse();
+         const req = {
+           body: {
+             projectId: 'my-project',
+             region: 'europe-west4',
+             model: 'gemini-3.5-flash',
+             body: {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]},
+           },
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/score').handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               'https://europe-west4-aiplatform.googleapis.com/v1/projects/my-project/locations/europe-west4/publishers/google/models/gemini-3.5-flash:generateContent',
+           method: 'POST',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(scorePayload);
+       });
+
+    it('returns 400 when region is invalid', async () => {
+      const requestSpy = stubOAuthRequest({});
+      const {res, statusSpy, sendSpy} = createScoreResponse();
+      const req = {
+        body: {
+          projectId: 'my-project',
+          region: 'eu/../bad',
+          model: 'gemini-3.5-flash',
+          body: {},
+        },
+        session: {token: {access_token: 'mock-access-token'}},
+      } as unknown as Request;
+
+      await findRouteHandler('/api/v1/score').handle(req, res, () => {});
+
+      expect(statusSpy).toHaveBeenCalledTimes(1);
+      expect(statusSpy).toHaveBeenCalledWith(400);
+      expect(sendSpy).toHaveBeenCalledTimes(1);
+      expect(sendSpy).toHaveBeenCalledWith(
+          'Invalid or missing region parameter.');
+      expect(requestSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('/api/v1/engines', () => {
+    it('lists engines from eu-discoveryengine.googleapis.com when region is eu',
+       async () => {
+         const enginesPayload = {
+           engines: [{
+             name:
+                 'projects/123/locations/eu/collections/default_collection/engines/e1',
+           }],
+         };
+         const requestSpy = stubOAuthRequest(enginesPayload);
+         const jsonSpy = jasmine.createSpy('json');
+         const res = {
+           status: jasmine.createSpy('status'),
+           json: jsonSpy,
+         } as unknown as Response;
+         const req = {
+           query: {projectId: 'my-project', region: 'eu'},
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/engines').handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               'https://eu-discoveryengine.googleapis.com/v1alpha/projects/my-project/locations/eu/collections/default_collection/engines',
+           method: 'GET',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(enginesPayload);
+       });
+
+    it('lists engines from discoveryengine.googleapis.com when region is global',
+       async () => {
+         const enginesPayload = {engines: []};
+         const requestSpy = stubOAuthRequest(enginesPayload);
+         const jsonSpy = jasmine.createSpy('json');
+         const res = {
+           status: jasmine.createSpy('status'),
+           json: jsonSpy,
+         } as unknown as Response;
+         const req = {
+           query: {projectId: 'my-project', region: 'global'},
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/engines').handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               'https://discoveryengine.googleapis.com/v1alpha/projects/my-project/locations/global/collections/default_collection/engines',
+           method: 'GET',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(enginesPayload);
+       });
+
+    it('lists engines from us-discoveryengine.googleapis.com when region is us',
+       async () => {
+         const enginesPayload = {engines: []};
+         const requestSpy = stubOAuthRequest(enginesPayload);
+         const jsonSpy = jasmine.createSpy('json');
+         const res = {
+           status: jasmine.createSpy('status'),
+           json: jsonSpy,
+         } as unknown as Response;
+         const req = {
+           query: {projectId: 'my-project', region: 'us'},
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/engines').handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               'https://us-discoveryengine.googleapis.com/v1alpha/projects/my-project/locations/us/collections/default_collection/engines',
+           method: 'GET',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(enginesPayload);
+       });
+
+    it('lists engines from {region}-discoveryengine.googleapis.com for single regions',
+       async () => {
+         const enginesPayload = {engines: []};
+         const requestSpy = stubOAuthRequest(enginesPayload);
+         const jsonSpy = jasmine.createSpy('json');
+         const res = {
+           status: jasmine.createSpy('status'),
+           json: jsonSpy,
+         } as unknown as Response;
+         const req = {
+           query: {projectId: 'my-project', region: 'europe-west4'},
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/engines').handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               'https://europe-west4-discoveryengine.googleapis.com/v1alpha/projects/my-project/locations/europe-west4/collections/default_collection/engines',
+           method: 'GET',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(enginesPayload);
+       });
+  });
+
+  describe('/api/v1/widget-config', () => {
+    it('fetches widget config from eu-discoveryengine.googleapis.com for a bare engine ID',
+       async () => {
+         const widgetPayload = {collectionComponents: []};
+         const requestSpy = stubOAuthRequest(widgetPayload);
+         const jsonSpy = jasmine.createSpy('json');
+         const res = {
+           status: jasmine.createSpy('status'),
+           json: jsonSpy,
+         } as unknown as Response;
+         const req = {
+           query: {
+             projectId: 'my-project',
+             region: 'eu',
+             engineId: 'my-engine',
+           },
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/widget-config')
+             .handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               'https://eu-discoveryengine.googleapis.com/v1alpha/projects/my-project/locations/eu/collections/default_collection/engines/my-engine/widgetConfigs/default_search_widget_config',
+           method: 'GET',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(widgetPayload);
+       });
+
+    it('fetches widget config from eu-discoveryengine.googleapis.com for a full engine path',
+       async () => {
+         const enginePath =
+             'projects/123456/locations/eu/collections/default_collection/engines/my-engine';
+         const widgetPayload = {collectionComponents: []};
+         const requestSpy = stubOAuthRequest(widgetPayload);
+         const jsonSpy = jasmine.createSpy('json');
+         const res = {
+           status: jasmine.createSpy('status'),
+           json: jsonSpy,
+         } as unknown as Response;
+         const req = {
+           query: {
+             projectId: 'my-project',
+             region: 'eu',
+             engineId: enginePath,
+           },
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/widget-config')
+             .handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               `https://eu-discoveryengine.googleapis.com/v1alpha/${enginePath}/widgetConfigs/default_search_widget_config`,
+           method: 'GET',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(widgetPayload);
+       });
+
+    it('fetches widget config from discoveryengine.googleapis.com when region is global',
+       async () => {
+         const widgetPayload = {collectionComponents: []};
+         const requestSpy = stubOAuthRequest(widgetPayload);
+         const jsonSpy = jasmine.createSpy('json');
+         const res = {
+           status: jasmine.createSpy('status'),
+           json: jsonSpy,
+         } as unknown as Response;
+         const req = {
+           query: {
+             projectId: 'my-project',
+             region: 'global',
+             engineId: 'my-engine',
+           },
+           session: {token: {access_token: 'mock-access-token'}},
+         } as unknown as Request;
+
+         await findRouteHandler('/api/v1/widget-config')
+             .handle(req, res, () => {});
+
+         expect(requestSpy).toHaveBeenCalledTimes(1);
+         expect(requestSpy).toHaveBeenCalledWith(jasmine.objectContaining({
+           url:
+               'https://discoveryengine.googleapis.com/v1alpha/projects/my-project/locations/global/collections/default_collection/engines/my-engine/widgetConfigs/default_search_widget_config',
+           method: 'GET',
+           headers:
+               jasmine.objectContaining({'x-goog-user-project': 'my-project'}),
+         }));
+         expect(jsonSpy).toHaveBeenCalledTimes(1);
+         expect(jsonSpy).toHaveBeenCalledWith(widgetPayload);
        });
   });
 
   describe('/api/v1/trace', () => {
     it('should return 400 when projectId or assistToken is missing or not a string',
        async () => {
-         const router = createProxyRouter(mockConfig);
-         const route =
-             router.stack.find(s => s.route?.path === '/api/v1/trace');
-         expect(route).toBeDefined();
+         const routeHandler = findRouteHandler('/api/v1/trace');
 
          const sendSpy = jasmine.createSpy('send');
          const statusSpy =
@@ -167,12 +652,12 @@ describe('proxy module', () => {
            json: jasmine.createSpy('json'),
          } as unknown as Response;
 
-         await route!.route!.stack[0].handle(
+         await routeHandler.handle(
              {query: {projectId: 'p1'}} as unknown as Request, res, () => {});
          expect(statusSpy).toHaveBeenCalledWith(400);
 
          statusSpy.calls.reset();
-         await route!.route!.stack[0].handle(
+         await routeHandler.handle(
              {query: {projectId: ['p1', 'p2'], assistToken: 'token-xyz'}} as
                  unknown as Request,
              res, () => {});
@@ -181,17 +666,8 @@ describe('proxy module', () => {
 
     it('should call Cloud Trace API and return the first matching traceId',
        async () => {
-         const router = createProxyRouter(mockConfig);
-         const route =
-             router.stack.find(s => s.route?.path === '/api/v1/trace');
-         expect(route).toBeDefined();
-
-         const requestSpy = jasmine.createSpy('request').and.resolveTo(
-             {data: {traces: [{traceId: 'trace-abc-123'}]}});
-         spyOn(google.auth, 'OAuth2').and.returnValue({
-           setCredentials: jasmine.createSpy('setCredentials'),
-           request: requestSpy,
-         } as unknown as InstanceType<typeof google.auth.OAuth2>);
+         const requestSpy =
+             stubOAuthRequest({traces: [{traceId: 'trace-abc-123'}]});
 
          const req = {
            query: {
@@ -211,7 +687,7 @@ describe('proxy module', () => {
            json: jsonSpy,
          } as unknown as Response;
 
-         await route!.route!.stack[0].handle(req, res, () => {});
+         await findRouteHandler('/api/v1/trace').handle(req, res, () => {});
 
          expect(requestSpy).toHaveBeenCalledWith({
            url:
@@ -225,17 +701,7 @@ describe('proxy module', () => {
 
     it('should return undefined traceId when Cloud Trace API returns empty data',
        async () => {
-         const router = createProxyRouter(mockConfig);
-         const route =
-             router.stack.find(s => s.route?.path === '/api/v1/trace');
-         expect(route).toBeDefined();
-
-         const requestSpy =
-             jasmine.createSpy('request').and.resolveTo({data: {}});
-         spyOn(google.auth, 'OAuth2').and.returnValue({
-           setCredentials: jasmine.createSpy('setCredentials'),
-           request: requestSpy,
-         } as unknown as InstanceType<typeof google.auth.OAuth2>);
+         stubOAuthRequest({});
 
          const req = {
            query: {
@@ -255,28 +721,18 @@ describe('proxy module', () => {
            json: jsonSpy,
          } as unknown as Response;
 
-         await route!.route!.stack[0].handle(req, res, () => {});
+         await findRouteHandler('/api/v1/trace').handle(req, res, () => {});
 
          expect(jsonSpy).toHaveBeenCalledWith({traceId: undefined});
        });
 
     it('should forward upstream error status and message on failure',
        async () => {
-         const router = createProxyRouter(mockConfig);
-         const route =
-             router.stack.find(s => s.route?.path === '/api/v1/trace');
-         expect(route).toBeDefined();
-
          const upstreamError =
              Object.assign(new Error('Permission denied'), {
                response: {status: 403},
              });
-         const requestSpy =
-             jasmine.createSpy('request').and.rejectWith(upstreamError);
-         spyOn(google.auth, 'OAuth2').and.returnValue({
-           setCredentials: jasmine.createSpy('setCredentials'),
-           request: requestSpy,
-         } as unknown as InstanceType<typeof google.auth.OAuth2>);
+         stubOAuthRequest({}).and.rejectWith(upstreamError);
 
          const req = {
            query: {
@@ -298,7 +754,7 @@ describe('proxy module', () => {
            json: jasmine.createSpy('json'),
          } as unknown as Response;
 
-         await route!.route!.stack[0].handle(req, res, () => {});
+         await findRouteHandler('/api/v1/trace').handle(req, res, () => {});
 
          expect(statusSpy).toHaveBeenCalledWith(403);
          expect(sendSpy).toHaveBeenCalledWith(
@@ -309,13 +765,6 @@ describe('proxy module', () => {
   describe('/api/v1/agents', () => {
     const ENGINE_PATH =
         'projects/my-project/locations/global/collections/default_collection/engines/my-engine';
-
-    function findAgentsRoute() {
-      const router = createProxyRouter(mockConfig);
-      const route = router.stack.find(s => s.route?.path === '/api/v1/agents');
-      expect(route).toBeDefined();
-      return route!.route!.stack[0];
-    }
 
     function createRequest(query: Record<string, unknown>): Request {
       return {
@@ -347,13 +796,14 @@ describe('proxy module', () => {
          } as unknown as globalThis.Response);
          const {res, jsonSpy} = createResponse();
 
-         await findAgentsRoute().handle(
-             createRequest({
-               projectId: 'my-project',
-               region: 'global',
-               engineId: 'my-engine',
-             }),
-             res, () => {});
+         await findRouteHandler('/api/v1/agents')
+             .handle(
+                 createRequest({
+                   projectId: 'my-project',
+                   region: 'global',
+                   engineId: 'my-engine',
+                 }),
+                 res, () => {});
 
          expect(mockFetch).toHaveBeenCalledWith(
              `https://discoveryengine.googleapis.com/v1alpha/${ENGINE_PATH}/assistants/default_assistant/agents?pageSize=1000`,
@@ -376,13 +826,14 @@ describe('proxy module', () => {
          } as unknown as globalThis.Response);
          const {res} = createResponse();
 
-         await findAgentsRoute().handle(
-             createRequest({
-               projectId: 'my-project',
-               region: 'eu',
-               engineId: 'my-engine',
-             }),
-             res, () => {});
+         await findRouteHandler('/api/v1/agents')
+             .handle(
+                 createRequest({
+                   projectId: 'my-project',
+                   region: 'eu',
+                   engineId: 'my-engine',
+                 }),
+                 res, () => {});
 
          expect(mockFetch.calls.mostRecent().args[0])
              .toBe(
@@ -400,13 +851,14 @@ describe('proxy module', () => {
          } as unknown as globalThis.Response);
          const {res} = createResponse();
 
-         await findAgentsRoute().handle(
-             createRequest({
-               projectId: 'my-project',
-               region: 'eu',
-               engineId: enginePath,
-             }),
-             res, () => {});
+         await findRouteHandler('/api/v1/agents')
+             .handle(
+                 createRequest({
+                   projectId: 'my-project',
+                   region: 'eu',
+                   engineId: enginePath,
+                 }),
+                 res, () => {});
 
          expect(mockFetch.calls.mostRecent().args[0])
              .toBe(`https://eu-discoveryengine.googleapis.com/v1alpha/${
@@ -425,7 +877,7 @@ describe('proxy module', () => {
            session: {},
          } as unknown as Request;
 
-         await findAgentsRoute().handle(req, res, () => {});
+         await findRouteHandler('/api/v1/agents').handle(req, res, () => {});
 
          expect(statusSpy).toHaveBeenCalledWith(401);
          expect(sendSpy).toHaveBeenCalledWith('Not authenticated.');
@@ -441,13 +893,14 @@ describe('proxy module', () => {
          } as unknown as globalThis.Response);
          const {res, statusSpy, sendSpy} = createResponse();
 
-         await findAgentsRoute().handle(
-             createRequest({
-               projectId: 'my-project',
-               region: 'global',
-               engineId: 'my-engine',
-             }),
-             res, () => {});
+         await findRouteHandler('/api/v1/agents')
+             .handle(
+                 createRequest({
+                   projectId: 'my-project',
+                   region: 'global',
+                   engineId: 'my-engine',
+                 }),
+                 res, () => {});
 
          expect(statusSpy).toHaveBeenCalledWith(403);
          expect(sendSpy).toHaveBeenCalledWith('Forbidden');
@@ -457,13 +910,14 @@ describe('proxy module', () => {
       spyOn(globalThis, 'fetch').and.rejectWith(new Error('network down'));
       const {res, statusSpy, sendSpy} = createResponse();
 
-      await findAgentsRoute().handle(
-          createRequest({
-            projectId: 'my-project',
-            region: 'global',
-            engineId: 'my-engine',
-          }),
-          res, () => {});
+      await findRouteHandler('/api/v1/agents')
+          .handle(
+              createRequest({
+                projectId: 'my-project',
+                region: 'global',
+                engineId: 'my-engine',
+              }),
+              res, () => {});
 
       expect(statusSpy).toHaveBeenCalledWith(500);
       expect(sendSpy).toHaveBeenCalledWith(
@@ -511,9 +965,10 @@ describe('proxy module', () => {
            ],
          ];
 
+         const routeHandler = findRouteHandler('/api/v1/agents');
          for (const [query, message] of cases) {
            const {res, statusSpy, sendSpy} = createResponse();
-           await findAgentsRoute().handle(createRequest(query), res, () => {});
+           await routeHandler.handle(createRequest(query), res, () => {});
            expect(statusSpy)
                .withContext(JSON.stringify(query))
                .toHaveBeenCalledWith(400);

@@ -80,10 +80,13 @@ export class StateService {
 
     const {gCloudToken, selectedEngine, selectedModel, selectedAgent,
            ...safeConfig} = savedConfig;
+    const region = safeConfig.region || defaultConfig.region;
 
     return {
       ...defaultConfig,
       ...safeConfig,
+      region,
+      autoRaterLocation: safeConfig.autoRaterLocation || region,
       gCloudToken: '',
       selectedEngine: '',
       selectedModel: '',

@@ -35,6 +35,24 @@
       {{ selectionSummary }}. Scorers run in the order listed above.
     </div>
   </div>
+  <div *ngIf="usesConfigKey('autoRaterLocation')">
+    <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
+      ><span>Auto Rater Location</span
+      ><app-info-tooltip
+        class="inline-flex"
+        text="The Vertex AI location used to call the auto-rater model. Multi-regional locations (us, eu) keep scoring requests in-region and offer a subset of models; choose global for models only served globally."
+      ></app-info-tooltip
+    ></label>
+    <select
+      aria-label="Auto Rater Location"
+      [attr.aria-describedby]="inputDescribedBy('autoRaterLocation')"
+      [ngModel]="autoRaterLocation"
+      (ngModelChange)="onAutoRaterLocationChange($event)"
+      class="w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+    >
+      <option *ngFor="let loc of autoRaterLocations" [value]="loc">{{ loc }}</option>
+    </select>
+  </div>
   <div *ngIf="usesConfigKey('autoRaterModel')">
     <label class="flex items-center gap-1 text-sm font-medium text-gray-700 mb-1"
       ><span>Auto Rater Model</span

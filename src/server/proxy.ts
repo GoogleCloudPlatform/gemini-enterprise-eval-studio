@@ -40,6 +40,40 @@ const STRICT_ENGINE_PATH_REGEX =
 /** The largest page size that ListAgents accepts. */
 const MAX_AGENT_PAGE_SIZE = 1000;
 
+// Keep Discovery Engine and Vertex AI endpoint routing in sync with
+// src/app/services/direct-gcp-eval-backend.service.ts.
+
+/** Multi-regional locations that use Vertex AI `.rep.googleapis.com` endpoints. */
+const VERTEX_MULTI_REGIONAL_LOCATIONS: ReadonlySet<string> =
+    new Set(['us', 'eu']);
+
+/**
+ * Returns the Discovery Engine API hostname for the given location.
+ */
+function discoveryEngineBaseUrl(region: string): string {
+  return region === 'global'
+    ? 'discoveryengine.googleapis.com'
+    : `${region}-discoveryengine.googleapis.com`;
+}
+
+/**
+ * Returns the Vertex AI API hostname for the given location.
+ *
+ * Multi-regional locations (`us`, `eu`) use Multi-Regional Endpoints
+ * (`aiplatform.{region}.rep.googleapis.com`), `global` uses
+ * `aiplatform.googleapis.com`, and single regions use
+ * `{region}-aiplatform.googleapis.com`.
+ */
+function vertexAiBaseUrl(region: string): string {
+  if (region === 'global') {
+    return 'aiplatform.googleapis.com';
+  }
+  if (VERTEX_MULTI_REGIONAL_LOCATIONS.has(region)) {
+    return `aiplatform.${region}.rep.googleapis.com`;
+  }
+  return `${region}-aiplatform.googleapis.com`;
+}
+
 /**
  * Expands an `engineId` query parameter into a full engine resource name.
  *
@@ -141,11 +175,7 @@ export function createProxyRouter(config: Config, refreshTokenStore?: RefreshTok
       return;
     }
 
-    const baseUrl = region === 'global'
-      ? 'discoveryengine.googleapis.com'
-      : `${region}-discoveryengine.googleapis.com`;
-
-    const url = `https://${baseUrl}/v1/${selectedEngine}/assistants/default_assistant:streamAssist`;
+    const url = `https://${discoveryEngineBaseUrl(region)}/v1/${selectedEngine}/assistants/default_assistant:streamAssist`;
 
     try {
       const response = await fetch(url, {
@@ -213,10 +243,18 @@ export function createProxyRouter(config: Config, refreshTokenStore?: RefreshTok
       const auth = new google.auth.OAuth2();
       auth.setCredentials({ access_token: req.session?.token.access_token || '' });
 
-      const aiplatform = google.aiplatform({ version: 'v1', auth });
+      const aiplatform = google.aiplatform({
+        version: 'v1',
+        auth,
+        rootUrl: `https://${vertexAiBaseUrl(region)}/`,
+      });
       const response = await aiplatform.projects.locations.publishers.models.generateContent({
         model: `projects/${projectId}/locations/${region}/publishers/google/models/${model}`,
         requestBody: body,
+      }, {
+        headers: {
+          'x-goog-user-project': projectId,
+        },
       });
 
       res.json(response.data);
@@ -244,7 +282,11 @@ export function createProxyRouter(config: Config, refreshTokenStore?: RefreshTok
       const auth = new google.auth.OAuth2();
       auth.setCredentials({ access_token: req.session?.token.access_token || '' });
 
-      const discoveryengine = google.discoveryengine({ version: 'v1alpha', auth });
+      const discoveryengine = google.discoveryengine({
+        version: 'v1alpha',
+        auth,
+        rootUrl: `https://${discoveryEngineBaseUrl(region)}/`,
+      });
 
       const response = await discoveryengine.projects.locations.collections.engines.list({
         parent: `projects/${projectId}/locations/${region}/collections/default_collection`,
@@ -285,7 +327,11 @@ export function createProxyRouter(config: Config, refreshTokenStore?: RefreshTok
       const auth = new google.auth.OAuth2();
       auth.setCredentials({ access_token: req.session?.token.access_token || '' });
 
-      const discoveryengine = google.discoveryengine({ version: 'v1alpha', auth });
+      const discoveryengine = google.discoveryengine({
+        version: 'v1alpha',
+        auth,
+        rootUrl: `https://${discoveryEngineBaseUrl(region)}/`,
+      });
       const enginePath = engineId.startsWith('projects/')
         ? engineId
         : `projects/${projectId}/locations/${region}/collections/default_collection/engines/${engineId}`;
@@ -371,10 +417,7 @@ export function createProxyRouter(config: Config, refreshTokenStore?: RefreshTok
       return;
     }
 
-    const baseUrl = region === 'global'
-      ? 'discoveryengine.googleapis.com'
-      : `${region}-discoveryengine.googleapis.com`;
-    const url = `https://${baseUrl}/v1alpha/${enginePath}/assistants/default_assistant/agents?pageSize=${MAX_AGENT_PAGE_SIZE}`;
+    const url = `https://${discoveryEngineBaseUrl(region)}/v1alpha/${enginePath}/assistants/default_assistant/agents?pageSize=${MAX_AGENT_PAGE_SIZE}`;
 
     try {
       const response = await fetch(url, {

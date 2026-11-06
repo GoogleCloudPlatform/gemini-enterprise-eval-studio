@@ -93,6 +93,12 @@ describe('ScoringSetupComponent', () => {
         NodeListOf<HTMLInputElement>);
   }
 
+  /** The auto rater location input, or null while no selected scorer needs it. */
+  function locationSelect(): HTMLSelectElement|null {
+    return fixture.nativeElement.querySelector(
+        '[aria-label="Auto Rater Location"]');
+  }
+
   /** The auto rater model input, or null while no selected scorer needs it. */
   function modelSelect(): HTMLSelectElement|null {
     return fixture.nativeElement.querySelector(
@@ -246,13 +252,55 @@ describe('ScoringSetupComponent', () => {
      async () => {
        await setUp([
          new FakeScorer('a', 'A'),
-         new FakeScorer('b', 'B', ['autoRaterModel'])
+         new FakeScorer('b', 'B', ['autoRaterLocation', 'autoRaterModel'])
        ]);
+       expect(locationSelect()).toBeNull();
        expect(modelSelect()).toBeNull();
 
        checkboxes()[1].click();
        fixture.detectChanges();
 
+       expect(locationSelect()).not.toBeNull();
        expect(modelSelect()).not.toBeNull();
+     });
+
+  it('should filter offered auto rater models for multi-regional locations without mutating config on render',
+     async () => {
+       await setUp(
+           [new FakeScorer(
+               'auto', 'Auto', ['autoRaterLocation', 'autoRaterModel'])],
+           {region: 'eu', autoRaterModel: 'gemini-3.1-pro-preview'});
+
+       expect(config.autoRaterLocation).toBeUndefined();
+       expect(config.autoRaterModel).toBe('gemini-3.1-pro-preview');
+       expect(fixture.componentInstance.autoRaterLocation).toBe('eu');
+       const options =
+           Array.from(modelSelect()!.options).map(o => o.value);
+       expect(options).toEqual(['gemini-3.5-flash']);
+     });
+
+  it('should update autoRaterLocation and reconcile autoRaterModel when changed by the user',
+     async () => {
+       await setUp(
+           [new FakeScorer(
+               'auto', 'Auto', ['autoRaterLocation', 'autoRaterModel'])],
+           {
+             region: 'global',
+             autoRaterLocation: 'global',
+             autoRaterModel: 'gemini-3.1-pro-preview',
+           });
+       const changes: AppConfig[] = [];
+       fixture.componentInstance.configChange.subscribe(
+           c => void changes.push(c));
+
+       fixture.componentInstance.onAutoRaterLocationChange('eu');
+       fixture.detectChanges();
+
+       expect(config.autoRaterLocation).toBe('eu');
+       expect(config.autoRaterModel).toBe('gemini-3.5-flash');
+       expect(fixture.componentInstance.autoRaterModels).toEqual([
+         'gemini-3.5-flash'
+       ]);
+       expect(changes).toEqual([config]);
      });
 });

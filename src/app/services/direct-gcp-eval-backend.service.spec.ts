@@ -46,6 +46,257 @@ describe('DirectGcpEvalBackendService', () => {
     });
   });
 
+  describe('callAssist', () => {
+    it('routes eu streamAssist requests to eu-discoveryengine.googleapis.com', async () => {
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response('[]', {status: 200})
+      );
+      const enginePath =
+          'projects/test-project/locations/eu/collections/default_collection/engines/test-engine';
+
+      await service.callAssist({
+        selectedEngine: enginePath,
+        region: 'eu',
+        body: {query: {text: 'hello'}},
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://eu-discoveryengine.googleapis.com/v1/${enginePath}/assistants/default_assistant:streamAssist`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer test-token',
+          },
+          body: JSON.stringify({query: {text: 'hello'}}),
+        }
+      );
+    });
+
+    it('routes global streamAssist requests to discoveryengine.googleapis.com', async () => {
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response('[]', {status: 200})
+      );
+      const enginePath =
+          'projects/test-project/locations/global/collections/default_collection/engines/test-engine';
+
+      await service.callAssist({
+        selectedEngine: enginePath,
+        region: 'global',
+        body: {query: {text: 'hello'}},
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://discoveryengine.googleapis.com/v1/${enginePath}/assistants/default_assistant:streamAssist`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer test-token',
+          },
+          body: JSON.stringify({query: {text: 'hello'}}),
+        }
+      );
+    });
+  });
+
+  describe('callScore', () => {
+    it('routes global scoring requests to aiplatform.googleapis.com', async () => {
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify({}), {status: 200})
+      );
+      const body = {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]};
+
+      await service.callScore({
+        projectId: 'test-project',
+        region: 'global',
+        model: 'gemini-3.5-flash',
+        body,
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-3.5-flash:generateContent',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'x-goog-user-project': 'test-project',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    });
+
+    it('routes eu multi-regional scoring requests to aiplatform.eu.rep.googleapis.com', async () => {
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify({}), {status: 200})
+      );
+      const body = {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]};
+
+      await service.callScore({
+        projectId: 'test-project',
+        region: 'eu',
+        model: 'gemini-3.5-flash',
+        body,
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://aiplatform.eu.rep.googleapis.com/v1/projects/test-project/locations/eu/publishers/google/models/gemini-3.5-flash:generateContent',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'x-goog-user-project': 'test-project',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    });
+
+    it('routes us multi-regional scoring requests to aiplatform.us.rep.googleapis.com', async () => {
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify({}), {status: 200})
+      );
+      const body = {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]};
+
+      await service.callScore({
+        projectId: 'test-project',
+        region: 'us',
+        model: 'gemini-3.5-flash',
+        body,
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://aiplatform.us.rep.googleapis.com/v1/projects/test-project/locations/us/publishers/google/models/gemini-3.5-flash:generateContent',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'x-goog-user-project': 'test-project',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    });
+
+    it('routes single-region scoring requests to {region}-aiplatform.googleapis.com', async () => {
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify({}), {status: 200})
+      );
+      const body = {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]};
+
+      await service.callScore({
+        projectId: 'test-project',
+        region: 'europe-west4',
+        model: 'gemini-3.5-flash',
+        body,
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://europe-west4-aiplatform.googleapis.com/v1/projects/test-project/locations/europe-west4/publishers/google/models/gemini-3.5-flash:generateContent',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'x-goog-user-project': 'test-project',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    });
+
+    it('falls back to global when region is empty', async () => {
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify({}), {status: 200})
+      );
+      const body = {contents: [{role: 'user', parts: [{text: 'Rate this'}]}]};
+
+      await service.callScore({
+        projectId: 'test-project',
+        region: '',
+        model: 'gemini-3.5-flash',
+        body,
+      });
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://aiplatform.googleapis.com/v1/projects/test-project/locations/global/publishers/google/models/gemini-3.5-flash:generateContent',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'x-goog-user-project': 'test-project',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(body),
+        }
+      );
+    });
+  });
+
+  describe('fetchEngines', () => {
+    it('fetches engines from eu-discoveryengine.googleapis.com when region is eu', async () => {
+      const engine = {
+        name: 'projects/123/locations/eu/collections/default_collection/engines/e1',
+        displayName: 'EU Engine',
+      };
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify({engines: [engine]}), {status: 200})
+      );
+
+      const engines = await service.fetchEngines(
+          'test-project', 'eu', stateService.getCurrentConfig());
+
+      expect(engines).toEqual([engine]);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://eu-discoveryengine.googleapis.com/v1alpha/projects/test-project/locations/eu/collections/default_collection/engines',
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'x-goog-user-project': 'test-project',
+          },
+        }
+      );
+    });
+  });
+
+  describe('fetchWidgetConfig', () => {
+    it('fetches widget config from eu-discoveryengine.googleapis.com when region is eu', async () => {
+      const widgetConfig = {collectionComponents: []};
+      const fetchSpy = spyOn(window, 'fetch').and.resolveTo(
+        new Response(JSON.stringify(widgetConfig), {status: 200})
+      );
+
+      const result = await service.fetchWidgetConfig(
+          'test-project', 'eu', 'my-engine', stateService.getCurrentConfig());
+
+      expect(result).toEqual(widgetConfig);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://eu-discoveryengine.googleapis.com/v1alpha/projects/test-project/locations/eu/collections/default_collection/engines/my-engine/widgetConfigs/default_search_widget_config',
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': 'Bearer test-token',
+            'x-goog-user-project': 'test-project',
+          },
+        }
+      );
+    });
+  });
+
   describe('fetchTraceId', () => {
     it('passes Authorization and x-goog-user-project headers and returns traceId', async () => {
       const fetchSpy = spyOn(window, 'fetch').and.resolveTo(

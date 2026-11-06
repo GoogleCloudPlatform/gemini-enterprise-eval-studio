@@ -31,6 +31,34 @@ const DEFAULT_ASSISTANT_ID = 'default_assistant';
  */
 const MAX_AGENT_PAGE_SIZE = 1000;
 
+// Keep Discovery Engine and Vertex AI endpoint routing in sync with
+// src/server/proxy.ts.
+
+/** Multi-regional locations that use Vertex AI `.rep.googleapis.com` endpoints. */
+const VERTEX_MULTI_REGIONAL_LOCATIONS: ReadonlySet<string> =
+    new Set(['us', 'eu']);
+
+/** The Discovery Engine host serving the given region. */
+function discoveryEngineBaseUrl(region: string): string {
+  return region === 'global'
+    ? 'discoveryengine.googleapis.com'
+    : `${region}-discoveryengine.googleapis.com`;
+}
+
+/**
+ * Returns the Vertex AI host serving the given region. Multi-regional locations
+ * (`us`, `eu`) use `.rep.googleapis.com` endpoints.
+ */
+function vertexAiBaseUrl(region: string): string {
+  if (region === 'global') {
+    return 'aiplatform.googleapis.com';
+  }
+  if (VERTEX_MULTI_REGIONAL_LOCATIONS.has(region)) {
+    return `aiplatform.${region}.rep.googleapis.com`;
+  }
+  return `${region}-aiplatform.googleapis.com`;
+}
+
 /**
  * Direct GCP implementation of EvalBackendService.
  * Used in no-auth mode to make direct calls to GCP APIs from the browser.
@@ -44,7 +72,7 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
 
   override async callAssist(request: AssistRequest): Promise<Response> {
     const {selectedEngine, region, body} = request;
-    const url = `https://${this.baseUrl(region)}/v1/${
+    const url = `https://${discoveryEngineBaseUrl(region)}/v1/${
         selectedEngine}/assistants/${DEFAULT_ASSISTANT_ID}:streamAssist`;
 
     return fetch(url, {
@@ -58,8 +86,11 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
   }
 
   override async callScore(request: ScoreRequest): Promise<Response> {
-    const {body, model, projectId} = request;
-    const url = `https://aiplatform.googleapis.com/v1/projects/${projectId}/locations/global/publishers/google/models/${model}:generateContent`;
+    const {body, model, projectId, region} = request;
+    const location = region.length > 0 ? region : 'global';
+    const url = `https://${vertexAiBaseUrl(location)}/v1/projects/${
+        projectId}/locations/${location}/publishers/google/models/${
+        model}:generateContent`;
 
     return fetch(url, {
       method: 'POST',
@@ -73,7 +104,7 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
   }
 
   override async fetchEngines(projectId: string, region: string, config: AppConfig): Promise<Engine[]> {
-    const url = `https://${this.baseUrl(region)}/v1alpha/projects/${projectId}/locations/${region}/collections/default_collection/engines`;
+    const url = `https://${discoveryEngineBaseUrl(region)}/v1alpha/projects/${projectId}/locations/${region}/collections/default_collection/engines`;
 
     const response = await fetch(url, {
       method: 'GET',
@@ -101,7 +132,7 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
     if (!config.gCloudToken || !projectId || !engineId) {
       return null;
     }
-    const url = `https://${this.baseUrl(region)}/v1alpha/${
+    const url = `https://${discoveryEngineBaseUrl(region)}/v1alpha/${
         this.enginePath(projectId, region, engineId)}/widgetConfigs/default_search_widget_config`;
 
     const response = await fetch(url, {
@@ -154,7 +185,7 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
       engineId: string,
       config: AppConfig
   ): Promise<Agent[]> {
-    const url = `https://${this.baseUrl(region)}/v1alpha/${
+    const url = `https://${discoveryEngineBaseUrl(region)}/v1alpha/${
         this.enginePath(projectId, region, engineId)}/assistants/${
         DEFAULT_ASSISTANT_ID}/agents?pageSize=${MAX_AGENT_PAGE_SIZE}`;
 
@@ -175,13 +206,6 @@ export class DirectGcpEvalBackendService extends EvalBackendService {
 
     const data = await response.json() as ListAgentsResponse;
     return data.agents || [];
-  }
-
-  /** The Discovery Engine host serving the given region. */
-  private baseUrl(region: string): string {
-    return region === 'global'
-      ? 'discoveryengine.googleapis.com'
-      : `${region}-discoveryengine.googleapis.com`;
   }
 
   /**

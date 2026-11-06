@@ -1401,4 +1401,71 @@ describe('ConfigFormComponent', () => {
       expect(component.config.autoRaterModel).toBe('gemini-3.1-pro-preview');
     });
   });
+
+  describe('autoRaterLocation and onRegionChange', () => {
+    it('should sync autoRaterLocation to region and normalize autoRaterModel when region changes to eu',
+       () => {
+         mockAuthService.showCredentialInputs = true;
+         const localFixture = TestBed.createComponent(ConfigFormComponent);
+         const localComponent = localFixture.componentInstance;
+         localFixture.detectChanges();
+         expect(localComponent.config.autoRaterModel)
+             .toBe('gemini-3.1-pro-preview');
+
+         mockStateService.setConfig.calls.reset();
+         localComponent.config.region = 'eu';
+         localComponent.onRegionChange();
+         localFixture.detectChanges();
+
+         expect(localComponent.config.autoRaterLocation).toBe('eu');
+         expect(localComponent.autoRaterModels).toEqual(['gemini-3.5-flash']);
+         expect(localComponent.config.autoRaterModel).toBe('gemini-3.5-flash');
+         expect(mockStateService.setConfig)
+             .toHaveBeenCalledWith(jasmine.objectContaining({
+               region: 'eu',
+               autoRaterLocation: 'eu',
+               autoRaterModel: 'gemini-3.5-flash',
+             }));
+
+         const modelSelect =
+             (localFixture.nativeElement as HTMLElement)
+                 .querySelector<HTMLSelectElement>(
+                     '[aria-label="Auto Rater Model"]')!;
+         expect(Array.from(modelSelect.options).map(o => o.value)).toEqual([
+           'gemini-3.5-flash'
+         ]);
+       });
+
+    it('should preserve manual autoRaterLocation override when projectId or gCloudToken changes',
+       () => {
+         mockAuthService.showCredentialInputs = true;
+         const localFixture = TestBed.createComponent(ConfigFormComponent);
+         const localComponent = localFixture.componentInstance;
+         localFixture.detectChanges();
+
+         // Switch engine region to eu (autoRaterLocation follows to eu).
+         localComponent.config.region = 'eu';
+         localComponent.onRegionChange();
+         localFixture.detectChanges();
+
+         // Override autoRaterLocation to global in Scoring Setup and choose pro.
+         localComponent.config.autoRaterLocation = 'global';
+         localComponent.onConfigChange();
+         localComponent.config.autoRaterModel = 'gemini-3.1-pro-preview';
+         localComponent.onConfigChange();
+
+         expect(localComponent.autoRaterModels).toEqual([
+           'gemini-3.1-pro-preview', 'gemini-3.5-flash'
+         ]);
+
+         // Changing projectId resets engines without overwriting autoRaterLocation.
+         localComponent.config.projectId = 'updated-project';
+         localComponent.changeConfigAndResetEngines();
+
+         expect(localComponent.config.region).toBe('eu');
+         expect(localComponent.config.autoRaterLocation).toBe('global');
+         expect(localComponent.config.autoRaterModel)
+             .toBe('gemini-3.1-pro-preview');
+       });
+  });
 });

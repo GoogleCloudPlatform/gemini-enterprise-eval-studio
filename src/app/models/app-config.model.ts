@@ -37,6 +37,12 @@ export interface AppConfig {
    * least one scoring method. See scoring/scorer.registry.ts.
    */
   selectedScorers?: string[];
+  /**
+   * Vertex AI location used to call the auto-rater model (for example `global`,
+   * `us`, or `eu`). Defaults to `region` when unset, and can be overridden in
+   * the scoring setup when a model is not offered in the engine's region.
+   */
+  autoRaterLocation?: string;
   autoRaterModel: string;
   autoRaterInstruction: string;
   selectedDataStores: string[];

@@ -23,6 +23,13 @@ import {ScoreResult, Scorer, ScoringRequest} from '../scorer';
 /** Identifier of the LLM-as-a-judge scorer. */
 export const AUTO_RATER_SCORER_ID = 'auto-rater';
 
+/** Locations offered for the auto-rater Vertex AI endpoint. */
+export const AUTO_RATER_LOCATIONS: readonly string[] = ['global', 'us', 'eu'];
+
+/** Multi-regional locations routed to Vertex AI Multi-Regional Endpoints. */
+const MULTI_REGIONAL_AUTO_RATER_LOCATIONS: ReadonlySet<string> =
+    new Set(['us', 'eu']);
+
 /** Models offered when the user supplies their own access token. */
 const MODELS_WITH_USER_CREDENTIALS =
     ['gemini-3.1-pro-preview', 'gemini-3.5-flash'];
@@ -31,15 +38,38 @@ const MODELS_WITH_USER_CREDENTIALS =
 const MODELS_WITH_BACKEND_CREDENTIALS = ['gemini-3.5-flash', 'gemini-3.1-pro'];
 
 /**
+ * Gemini models served by Vertex AI Multi-Regional Endpoints (`us`, `eu`).
+ * Multi-regional endpoints only serve a subset of Gemini models, so models not
+ * in this set (such as `gemini-3.1-pro*`) return 404 there.
+ */
+const MREP_SUPPORTED_AUTO_RATER_MODELS: ReadonlySet<string> =
+    new Set(['gemini-3.5-flash', 'gemini-3.1-flash-lite']);
+
+/**
+ * Resolves the Vertex AI location used for auto-rater calls, falling back to
+ * the engine's `region` (or `'global'`) when `autoRaterLocation` is unset.
+ */
+export function resolveAutoRaterLocation(
+    config: Pick<AppConfig, 'region'|'autoRaterLocation'>): string {
+  return config.autoRaterLocation?.trim() || config.region?.trim() || 'global';
+}
+
+/**
  * The auto-rater models to offer, so every place that edits the scoring setup
  * lists the same ones.
  * @param showCredentialInputs Whether the user supplies their own credentials.
+ * @param location The Vertex AI location where the auto-rater runs.
  * @returns The models to list, preferred one first.
  */
-export function listAutoRaterModels(showCredentialInputs: boolean): string[] {
+export function listAutoRaterModels(
+    showCredentialInputs: boolean, location = 'global'): string[] {
   // TODO b/514218151 - Fix hardcoded models.
-  return showCredentialInputs ? [...MODELS_WITH_USER_CREDENTIALS] :
-                                [...MODELS_WITH_BACKEND_CREDENTIALS];
+  const models = showCredentialInputs ? [...MODELS_WITH_USER_CREDENTIALS] :
+                                        [...MODELS_WITH_BACKEND_CREDENTIALS];
+  if (MULTI_REGIONAL_AUTO_RATER_LOCATIONS.has(location)) {
+    return models.filter(model => MREP_SUPPORTED_AUTO_RATER_MODELS.has(model));
+  }
+  return models;
 }
 
 /**
@@ -59,8 +89,11 @@ export class AutoRaterScorer extends Scorer {
   override readonly description =
       'Asks a Gemini model to rate the fetched response against the golden response using your rubric.';
   override readonly requiresGolden = true;
-  override readonly configKeys:
-      ReadonlyArray<keyof AppConfig> = ['autoRaterModel', 'autoRaterInstruction'];
+  override readonly configKeys: ReadonlyArray<keyof AppConfig> = [
+    'autoRaterLocation',
+    'autoRaterModel',
+    'autoRaterInstruction',
+  ];
 
   constructor(private readonly evalBackendService: EvalBackendService) {
     super();
@@ -70,6 +103,12 @@ export class AutoRaterScorer extends Scorer {
     // Report one problem at a time so the user fixes them in order.
     if (!config.autoRaterModel) {
       return 'Select an auto rater model.';
+    }
+    const location = resolveAutoRaterLocation(config);
+    if (MULTI_REGIONAL_AUTO_RATER_LOCATIONS.has(location) &&
+        !MREP_SUPPORTED_AUTO_RATER_MODELS.has(config.autoRaterModel)) {
+      return `Model '${config.autoRaterModel}' is not available in '${
+          location}'. Select an available model or change Auto Rater Location to 'global'.`;
     }
     const instruction = (config.autoRaterInstruction ?? '').trim();
     if (instruction.length < MIN_AUTO_RATER_INSTRUCTION_LENGTH) {
@@ -95,7 +134,7 @@ export class AutoRaterScorer extends Scorer {
     // so deployments that keep the credentials on the server keep working.
     const res = await this.evalBackendService.callScore({
       projectId: config.projectId,
-      region: config.region,
+      region: resolveAutoRaterLocation(config),
       model: config.autoRaterModel,
       body,
     });

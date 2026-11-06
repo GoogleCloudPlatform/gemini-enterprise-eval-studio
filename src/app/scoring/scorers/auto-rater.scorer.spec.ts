@@ -20,7 +20,7 @@ import {AppConfig} from '../../models/app-config.model';
 import {EvalBackendService} from '../../services/eval-backend.service';
 import {MockEvalBackendService} from '../../testing/mocks';
 
-import {AutoRaterScorer, MIN_AUTO_RATER_INSTRUCTION_LENGTH, listAutoRaterModels} from './auto-rater.scorer';
+import {AutoRaterScorer, MIN_AUTO_RATER_INSTRUCTION_LENGTH, listAutoRaterModels, resolveAutoRaterLocation} from './auto-rater.scorer';
 
 const CONFIG: AppConfig = {
   gCloudToken: 'token',
@@ -190,6 +190,26 @@ describe('AutoRaterScorer', () => {
                  {projectId: 'my-project', region: 'us-central1'}));
        });
 
+    it('should score in autoRaterLocation when overridden separately from engine region',
+       async () => {
+         respondWith(ratedWith('0.85'));
+
+         await score({
+           ...CONFIG,
+           projectId: 'my-project',
+           region: 'eu',
+           autoRaterLocation: 'global',
+           autoRaterModel: 'gemini-3.1-pro-preview',
+         });
+
+         expect(backend.callScoreSpy)
+             .toHaveBeenCalledWith(jasmine.objectContaining({
+               projectId: 'my-project',
+               region: 'global',
+               model: 'gemini-3.1-pro-preview',
+             }));
+       });
+
     it('should score with autoRaterModel regardless of selectedModel',
        async () => {
          respondWith(ratedWith('0.85'));
@@ -221,10 +241,47 @@ describe('AutoRaterScorer', () => {
       expect(scorer.requiresGolden).toBeTrue();
     });
 
+    it('should declare autoRaterLocation, autoRaterModel, and autoRaterInstruction as configKeys',
+       () => {
+         expect(scorer.configKeys).toEqual([
+           'autoRaterLocation',
+           'autoRaterModel',
+           'autoRaterInstruction',
+         ]);
+       });
+
     it('should reject a config without an auto rater model', () => {
       expect(scorer.validate({...CONFIG, autoRaterModel: ''})).toBeTruthy();
       expect(scorer.validate(CONFIG)).toBeUndefined();
     });
+
+    it('should reject models unsupported on multi-regional endpoints unless autoRaterLocation is global',
+       () => {
+         expect(scorer.validate({
+           ...CONFIG,
+           region: 'eu',
+           autoRaterModel: 'gemini-3.1-pro-preview',
+         })).toContain(`not available in 'eu'`);
+         expect(scorer.validate({
+           ...CONFIG,
+           region: 'us',
+           autoRaterLocation: 'us',
+           autoRaterModel: 'gemini-3.1-pro',
+         })).toContain(`not available in 'us'`);
+
+         expect(scorer.validate({
+           ...CONFIG,
+           region: 'eu',
+           autoRaterLocation: 'eu',
+           autoRaterModel: 'gemini-3.5-flash',
+         })).toBeUndefined();
+         expect(scorer.validate({
+           ...CONFIG,
+           region: 'eu',
+           autoRaterLocation: 'global',
+           autoRaterModel: 'gemini-3.1-pro-preview',
+         })).toBeUndefined();
+       });
 
     it('should reject a missing or blank instruction', () => {
       expect(scorer.validate({...CONFIG, autoRaterInstruction: ''}))
@@ -250,6 +307,18 @@ describe('AutoRaterScorer', () => {
   });
 });
 
+describe('resolveAutoRaterLocation', () => {
+  it('should prefer autoRaterLocation over region and fall back to global',
+     () => {
+       expect(resolveAutoRaterLocation(
+                  {region: 'eu', autoRaterLocation: 'global'}))
+           .toBe('global');
+       expect(resolveAutoRaterLocation({region: 'eu'})).toBe('eu');
+       expect(resolveAutoRaterLocation({region: '', autoRaterLocation: '  '}))
+           .toBe('global');
+     });
+});
+
 describe('listAutoRaterModels', () => {
   it('should offer the user credential models when the user supplies a token',
      () => {
@@ -260,6 +329,21 @@ describe('listAutoRaterModels', () => {
   it('should offer the backend models when the backend holds the credentials',
      () => {
        expect(listAutoRaterModels(false))
+           .toEqual(['gemini-3.5-flash', 'gemini-3.1-pro']);
+     });
+
+  it('should filter to mREP-supported models for us and eu locations', () => {
+    expect(listAutoRaterModels(true, 'eu')).toEqual(['gemini-3.5-flash']);
+    expect(listAutoRaterModels(true, 'us')).toEqual(['gemini-3.5-flash']);
+    expect(listAutoRaterModels(false, 'eu')).toEqual(['gemini-3.5-flash']);
+    expect(listAutoRaterModels(false, 'us')).toEqual(['gemini-3.5-flash']);
+  });
+
+  it('should offer the full model list for global and single-region locations',
+     () => {
+       expect(listAutoRaterModels(true, 'global'))
+           .toEqual(['gemini-3.1-pro-preview', 'gemini-3.5-flash']);
+       expect(listAutoRaterModels(false, 'europe-west4'))
            .toEqual(['gemini-3.5-flash', 'gemini-3.1-pro']);
      });
 

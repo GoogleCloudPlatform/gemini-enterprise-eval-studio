@@ -25,7 +25,7 @@ import {Agent, agentDisplayName} from '../../../models/agent.model';
 import {AppConfig, CollectionComponent, ConnectorAuthStateValue, DataStoreComponent, Engine, WidgetConfigResponse} from '../../../models/app-config.model';
 import {ConnectorOption, WEB_SEARCH_CONNECTOR_ID} from '../../../models/connector.model';
 import {ScorerSelection} from '../../../scoring/scorer-selection';
-import {listAutoRaterModels} from '../../../scoring/scorers/auto-rater.scorer';
+import {listAutoRaterModels, resolveAutoRaterLocation} from '../../../scoring/scorers/auto-rater.scorer';
 import {AgentListService, AgentListState} from '../../../services/agent-list.service';
 import {apiErrorMessage} from '../../../services/api-error';
 import {AuthService} from '../../../services/auth.service';
@@ -170,9 +170,11 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
   /**
    * The auto-rater models on offer. Rendered by `ScoringSetupComponent`; kept
    * here so an incoming configuration that names no model, or one this auth
-   * mode cannot use, is defaulted and persisted before a run starts.
+   * mode or location cannot use, is defaulted and persisted before a run
+   * starts.
    */
   autoRaterModels: string[] = listAutoRaterModels(true);
+  private currentAutoRaterLocation = 'global';
 
   engines: Engine[] = [];
   models: string[] = [];
@@ -241,6 +243,7 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
               this.fetchAgentsForSelectedEngine();
             }
           }
+          this.syncAutoRaterModelsForLocation();
           const autoRaterModelChanged = this.normalizeAutoRaterModel();
           if (scorersChanged || autoRaterModelChanged) {
             this.onConfigChange();
@@ -736,7 +739,29 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
    * Updates the global state with the current configuration.
    */
   onConfigChange() {
+    if (this.syncAutoRaterModelsForLocation()) {
+      this.normalizeAutoRaterModel();
+    }
     this.stateService.setConfig(this.config);
+  }
+
+  /**
+   * Syncs the auto-rater location to the newly selected engine region,
+   * reconciles the auto-rater model for that location, and resets engines.
+   */
+  onRegionChange() {
+    const location = resolveAutoRaterLocation({region: this.config.region});
+    this.currentAutoRaterLocation = location;
+    this.autoRaterModels =
+        listAutoRaterModels(this.authService.showCredentialInputs, location);
+    // Replace `config` so the OnPush `ScoringSetupComponent` picks up the new
+    // location and reconciled model even before `config$` emits back.
+    this.config = {
+      ...this.config,
+      autoRaterLocation: location,
+    };
+    this.normalizeAutoRaterModel();
+    this.changeConfigAndResetEngines();
   }
 
   /**
@@ -794,6 +819,17 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
       return 'Select Connectors';
     }
     return `${count} Connector${count > 1 ? 's' : ''} Selected`;
+  }
+
+  private syncAutoRaterModelsForLocation(): boolean {
+    const nextLocation = resolveAutoRaterLocation(this.config);
+    if (nextLocation === this.currentAutoRaterLocation) {
+      return false;
+    }
+    this.currentAutoRaterLocation = nextLocation;
+    this.autoRaterModels = listAutoRaterModels(
+        this.authService.showCredentialInputs, nextLocation);
+    return true;
   }
 
   /**

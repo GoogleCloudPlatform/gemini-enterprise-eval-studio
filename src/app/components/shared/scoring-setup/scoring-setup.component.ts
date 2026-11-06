@@ -21,7 +21,7 @@ import {FormsModule} from '@angular/forms';
 import type {AppConfig} from '../../../models/app-config.model';
 import {Scorer} from '../../../scoring/scorer';
 import {ScorerSelection} from '../../../scoring/scorer-selection';
-import {listAutoRaterModels} from '../../../scoring/scorers/auto-rater.scorer';
+import {AUTO_RATER_LOCATIONS, listAutoRaterModels, resolveAutoRaterLocation} from '../../../scoring/scorers/auto-rater.scorer';
 import {AuthService} from '../../../services/auth.service';
 import {InfoTooltipComponent} from '../info-tooltip/info-tooltip.component';
 
@@ -67,8 +67,14 @@ export class ScoringSetupComponent implements OnChanges {
   /** Emits `config`, edited in place, whenever the user changes something. */
   @Output() readonly configChange = new EventEmitter<AppConfig>();
 
-  /** The auto-rater models on offer. */
-  readonly autoRaterModels: readonly string[];
+  /** The Vertex AI location resolved for auto-rater requests. */
+  autoRaterLocation = 'global';
+
+  /** The auto-rater locations on offer. */
+  autoRaterLocations: readonly string[] = AUTO_RATER_LOCATIONS;
+
+  /** The auto-rater models on offer for `autoRaterLocation`. */
+  autoRaterModels: readonly string[];
 
   /** Prefix of the ids of the elements the controls point at. */
   private readonly idPrefix = `scoring-setup-${nextPanelId++}`;
@@ -90,9 +96,10 @@ export class ScoringSetupComponent implements OnChanges {
 
   constructor(
       private readonly selection: ScorerSelection,
-      authService: AuthService,
+      private readonly authService: AuthService,
   ) {
-    this.autoRaterModels = listAutoRaterModels(authService.showCredentialInputs);
+    this.autoRaterModels =
+        listAutoRaterModels(this.authService.showCredentialInputs);
   }
 
   /** Every registered scoring method, in display order. */
@@ -156,6 +163,17 @@ export class ScoringSetupComponent implements OnChanges {
     return this.errorConfigKeys.includes(key) ? this.errorId : null;
   }
 
+  /** Updates the auto-rater location and reconciles the selected model. */
+  onAutoRaterLocationChange(location: string) {
+    this.config.autoRaterLocation = location;
+    const models =
+        listAutoRaterModels(this.authService.showCredentialInputs, location);
+    if (!models.includes(this.config.autoRaterModel)) {
+      this.config.autoRaterModel = models[0] ?? '';
+    }
+    this.onConfigChange();
+  }
+
   /** Reports an edit made through one of the controls. */
   onConfigChange() {
     this.refresh();
@@ -168,6 +186,13 @@ export class ScoringSetupComponent implements OnChanges {
    * after every edit made through the panel.
    */
   private refresh() {
+    this.autoRaterLocation = resolveAutoRaterLocation(this.config);
+    this.autoRaterLocations =
+        AUTO_RATER_LOCATIONS.includes(this.autoRaterLocation) ?
+        AUTO_RATER_LOCATIONS :
+        [...AUTO_RATER_LOCATIONS, this.autoRaterLocation];
+    this.autoRaterModels = listAutoRaterModels(
+        this.authService.showCredentialInputs, this.autoRaterLocation);
     this.selectedScorers = this.selection.selected(this.config);
     this.selectionSummary = this.selection.summarize(this.config);
     this.validationError = this.selection.validate(this.config);

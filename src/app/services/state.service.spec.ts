@@ -75,6 +75,32 @@ describe('StateService', () => {
     expect(config.projectId).toBe('project');
     expect(config.selectedAgent).toBe('');
   });
+  it('should default autoRaterLocation to the stored region when unset', () => {
+    localStorage.setItem(
+        STORAGE_KEY, JSON.stringify({projectId: 'project', region: 'eu'}));
+
+    const config = new StateService().getCurrentConfig();
+
+    expect(config.region).toBe('eu');
+    expect(config.autoRaterLocation).toBe('eu');
+  });
+
+  it('should persist and restore an overridden autoRaterLocation',
+     fakeAsync(() => {
+       const service = new StateService();
+       service.setConfig({
+         ...service.getCurrentConfig(),
+         projectId: 'project',
+         region: 'eu',
+         autoRaterLocation: 'global',
+       });
+       tick(STORAGE_DEBOUNCE_MS);
+
+       const restored = new StateService().getCurrentConfig();
+
+       expect(restored.region).toBe('eu');
+       expect(restored.autoRaterLocation).toBe('global');
+     }));
 
   describe('connectors', () => {
     it('should return no connectors before any are set', () => {
