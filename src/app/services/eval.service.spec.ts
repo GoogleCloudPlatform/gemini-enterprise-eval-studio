@@ -1389,4 +1389,149 @@ describe('EvalService', () => {
           'projects/p/locations/global/collections/default_collection/engines/e/sessions/123');
     });
   });
+
+  describe('processRow connectors_override', () => {
+    const config: AppConfig = {
+      projectId: 'project',
+      region: 'global',
+      selectedEngine: 'engine',
+      selectedModel: 'model',
+      autoRaterModel: 'gemini-3.5-flash',
+      autoRaterInstruction: 'instructions',
+      selectedDataStores: ['global-ds'],
+      enableWebSearch: true
+    };
+    const dataStorePath = (id: string) =>
+        `projects/project/locations/global/collections/default_collection/dataStores/${id}`;
+
+    beforeEach(() => {
+      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
+      service['stateService'].setConnectors('engine', [
+        {
+          id: 'jira-connector',
+          displayName: 'Jira',
+          entityIds: ['jira-issues'],
+          searchableDataStoreIds: ['jira-issues']
+        },
+        {
+          id: 'SERVICENOW',
+          displayName: 'ServiceNow',
+          entityIds: ['sn-incident', 'sn-catalog'],
+          searchableDataStoreIds: ['sn-incident', 'sn-catalog']
+        },
+        {
+          id: 'global-ds',
+          displayName: 'global-ds',
+          entityIds: ['global-ds'],
+          searchableDataStoreIds: ['global-ds']
+        },
+      ]);
+      mockBackendService.callAssistSpy.and.resolveTo(new Response(JSON.stringify(
+          [{answer: {replies: [{groundedContent: {content: {text: 'hi'}}}]}}])));
+    });
+
+    function lastToolsSpec() {
+      return mockBackendService.callAssistSpy.calls.mostRecent().args[0].body
+          .toolsSpec;
+    }
+
+    it('expands a connector id into its data stores in default_collection', async () => {
+      await service.processRow(
+          {query: 'q', golden: '', connectors_override: 'jira-connector'});
+
+      expect(lastToolsSpec().vertexAiSearchSpec.dataStoreSpecs).toEqual([
+        {dataStore: dataStorePath('jira-issues')}
+      ]);
+    });
+
+    it('adds one dataStoreSpecs entry per data store of a multi-store connector', async () => {
+      await service.processRow(
+          {query: 'q', golden: '', connectors_override: 'SERVICENOW'});
+
+      expect(lastToolsSpec().vertexAiSearchSpec.dataStoreSpecs).toEqual([
+        {dataStore: dataStorePath('sn-incident')},
+        {dataStore: dataStorePath('sn-catalog')},
+      ]);
+    });
+
+    it('does not send an unknown connector id and flags it', async () => {
+      const result = await service.processRow(
+          {query: 'q', golden: '', connectors_override: 'typo-connector'});
+
+      // No vertexAiSearchSpec: an empty one would search every data store.
+      expect(lastToolsSpec()).toEqual({});
+      expect(result.connectorsUsed).toBe('typo-connector (not found)');
+    });
+
+    it('turns Vertex AI Search off when the cell is []', async () => {
+      const result = await service.processRow(
+          {query: 'q', golden: '', connectors_override: '[]'});
+
+      expect(lastToolsSpec()).toEqual({});
+      expect(result.connectorsUsed).toBe('(none)');
+    });
+
+    it('searches every data store for a blank cell when the global selection is empty',
+       async () => {
+         (service['stateService'].getCurrentConfig as jasmine.Spy)
+             .and.returnValue(
+                 {...config, selectedDataStores: [], enableWebSearch: false});
+
+         const result = await service.processRow(
+             {query: 'q', golden: '', connectors_override: ''});
+
+         expect(lastToolsSpec()).toEqual({vertexAiSearchSpec: {}});
+         expect(result.connectorsUsed).toBe('(all engine data stores)');
+       });
+
+    it('reports connectors as unavailable when none are known for the engine', async () => {
+      service['stateService'].setConnectors('other-engine', []);
+
+      const result = await service.processRow(
+          {query: 'q', golden: '', connectors_override: 'jira-connector'});
+
+      expect(lastToolsSpec()).toEqual({});
+      expect(result.connectorsUsed).toBe('jira-connector (connectors unavailable)');
+    });
+
+    it('includes webGroundingSpec when web_search is listed', async () => {
+      const result = await service.processRow({
+        query: 'q',
+        golden: '',
+        connectors_override: 'jira-connector;Web_Search'
+      });
+
+      expect(lastToolsSpec().webGroundingSpec).toEqual({});
+      expect(result.connectorsUsed).toBe('jira-connector, Web Search');
+    });
+
+    it('turns web search off when web_search is not listed', async () => {
+      await service.processRow(
+          {query: 'q', golden: '', connectors_override: 'jira-connector'});
+
+      expect(lastToolsSpec().webGroundingSpec).toBeUndefined();
+    });
+
+    it('falls back to the global settings when the cell is blank', async () => {
+      const result = await service.processRow(
+          {query: 'q', golden: '', connectors_override: ' '});
+
+      expect(lastToolsSpec()).toEqual({
+        vertexAiSearchSpec: {dataStoreSpecs: [{dataStore: dataStorePath('global-ds')}]},
+        webGroundingSpec: {}
+      });
+      expect(result.connectorsUsed).toBe('global-ds, Web Search');
+    });
+
+    it('sets connectorsUsed on an error row', async () => {
+      mockBackendService.callAssistSpy.and.resolveTo(
+          new Response('', {status: 500}));
+
+      const result = await service.processRow(
+          {query: 'q', golden: '', connectors_override: 'jira-connector'});
+
+      expect(result.fetched).toContain('Error');
+      expect(result.connectorsUsed).toBe('jira-connector');
+    });
+  });
 });

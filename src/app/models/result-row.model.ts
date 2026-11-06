@@ -90,4 +90,9 @@ export interface ResultRow {
   session?: string;
   /** Turn id returned by the Assistant API for this turn. */
   turnId?: string;
+  /**
+   * Comma-separated connectors the row was grounded on, such as
+   * `jira-connector, Web Search`, or `(none)`.
+   */
+  connectorsUsed?: string;
 }

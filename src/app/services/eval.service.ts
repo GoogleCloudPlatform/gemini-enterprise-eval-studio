@@ -22,6 +22,7 @@ import {CSVRow} from '../models/csv-row.model';
 import {ResultErrorCode, ResultRow, isScorableRow} from '../models/result-row.model';
 import {RowScoreError, ScorerRunResult, ScoringRequest} from '../scoring/scorer';
 import {ScorerRegistry} from '../scoring/scorer.registry';
+import {resolveRowGrounding} from '../utils/row-config.util';
 
 import {EvalBackendService} from './eval-backend.service';
 import {StateService} from './state.service';
@@ -114,24 +115,30 @@ export class EvalService {
       session?: string,
       config: AppConfig = this.stateService.getCurrentConfig(),
   ): Promise<ResultRow> {
+    const grounding = resolveRowGrounding(
+        row, config, this.stateService.getConnectors(config.selectedEngine));
 
-
+    // Once toolsSpec is sent, Vertex AI Search runs only if toolsSpec has a
+    // vertexAiSearchSpec. A vertexAiSearchSpec without dataStoreSpecs searches
+    // the engine's own data stores, which is the behavior of a run without
+    // connectors. A row whose override leaves no data stores therefore omits
+    // vertexAiSearchSpec, so it is not grounded on the engine's data stores.
     const toolsSpec: NonNullable<AssistRequestBody['toolsSpec']> = {};
 
-    if (config.selectedDataStores && config.selectedDataStores.length > 0) {
+    if (grounding.dataStoreIds.length > 0) {
       toolsSpec.vertexAiSearchSpec = {
-        dataStoreSpecs: config.selectedDataStores.map(
+        dataStoreSpecs: grounding.dataStoreIds.map(
             ds => ({
               dataStore: `projects/${config.projectId}/locations/${
                   config.region}/collections/default_collection/dataStores/${
                   ds}`
             }))
       };
-    } else if (!config.enableWebSearch) {
+    } else if (grounding.searchAllDataStores) {
       toolsSpec.vertexAiSearchSpec = {};
     }
 
-    if (config.enableWebSearch) {
+    if (grounding.enableWebSearch) {
       toolsSpec.webGroundingSpec = {};
     }
 
@@ -353,6 +360,7 @@ export class EvalService {
         turnId: sessionInfo?.turnId,
         traceId,
         traceUrl: this.getTraceUrl(traceId, projectId),
+        connectorsUsed: grounding.connectorsUsed,
       };
 
     } catch (error) {
@@ -381,6 +389,7 @@ export class EvalService {
         turnId: sessionInfo?.turnId,
         traceId,
         traceUrl: this.getTraceUrl(traceId, projectId),
+        connectorsUsed: grounding.connectorsUsed,
       };
     }
   }
