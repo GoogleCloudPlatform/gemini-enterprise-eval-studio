@@ -77,6 +77,11 @@ export interface ResultRow {
    * cited nothing.
    */
   trace?: AnswerTrace;
+  /**
+   * The input columns of the uploaded row that Eval Studio does not interpret
+   * itself (e.g. `expected_sources`), by header. Exported with the results.
+   */
+  inputColumns?: Record<string, string>;
   assistToken?: string;
   projectId?: string;
   region?: string;

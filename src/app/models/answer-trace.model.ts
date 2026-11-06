@@ -73,3 +73,55 @@ export function parseDocumentResource(document: string):
     connector: collection === DEFAULT_COLLECTION ? '' : collection,
   };
 }
+
+/**
+ * The distinct non-empty values of one field across the cited sources.
+ * @param trace The answer trace, if any.
+ * @param field The field to collect.
+ * @returns The values in first-cited order, without duplicates.
+ */
+export function distinctCitedValues(
+    trace: AnswerTrace|undefined,
+    field: 'dataStore'|'connector'): string[] {
+  const values = (trace?.citedSources ?? []).map(source => source[field]);
+  return [...new Set(values.filter(value => value))];
+}
+
+/**
+ * A human readable label for a cited source: its title and URI, or whichever
+ * of the two it has.
+ * @param source The cited source.
+ * @returns The label, e.g. `Refund Policy - https://example.com/refund`.
+ */
+export function citedSourceLabel(source: CitedSource): string {
+  if (source.title && source.uri && source.title !== source.uri) {
+    return `${source.title} - ${source.uri}`;
+  }
+  return source.title || source.uri || source.document;
+}
+
+/** An answer trace flattened into one text cell per kind of evidence. */
+export interface TraceCells {
+  /** One cited source label per line. */
+  citedSources: string;
+  /** The distinct cited data store ids, comma separated. */
+  citedDataStores: string;
+  /** The distinct cited connectors, comma separated. */
+  citedConnectors: string;
+}
+
+/**
+ * Flattens an answer trace for the results table and the CSV export. Every
+ * cell is present, and empty when nothing of its kind was cited, so every row
+ * exports the same columns.
+ * @param trace The answer trace, if any.
+ * @returns The cells.
+ */
+export function traceCells(trace: AnswerTrace|undefined): TraceCells {
+  return {
+    citedSources:
+        (trace?.citedSources ?? []).map(citedSourceLabel).join('\n'),
+    citedDataStores: distinctCitedValues(trace, 'dataStore').join(', '),
+    citedConnectors: distinctCitedValues(trace, 'connector').join(', '),
+  };
+}

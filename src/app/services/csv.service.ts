@@ -18,6 +18,9 @@ import {Injectable, NgZone} from '@angular/core';
 
 import * as Papa from 'papaparse';
 
+/** The UTF-8 byte order mark, which tells Excel how a CSV file is encoded. */
+export const UTF8_BOM = '\uFEFF';
+
 /**
  * Service for parsing and exporting CSV files.
  */
@@ -51,12 +54,23 @@ export class CsvService {
   }
 
   /**
+   * Serializes rows to CSV text, prefixed with a UTF-8 byte order mark so
+   * Excel decodes non-ASCII text (titles, URIs, `°C`, …) as UTF-8 rather than
+   * the system code page.
+   * @param data The rows to serialize. The header comes from the first row.
+   * @returns The CSV text.
+   */
+  toCsv(data: object[]): string {
+    return UTF8_BOM + Papa.unparse(data);
+  }
+
+  /**
    * Exports data to a CSV file.
    * @param data The data to export.
    * @param filename The name of the file to create.
    */
   exportCSV(data: Array<object>, filename: string) {
-    const csv = Papa.unparse(data);
+    const csv = this.toCsv(data);
     const blob = new Blob([csv], {type: 'application/octet-stream'});
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

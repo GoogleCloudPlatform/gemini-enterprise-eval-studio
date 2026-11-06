@@ -19,7 +19,7 @@ import {Injectable} from '@angular/core';
 import {agentIdFromResourceName} from '../models/agent.model';
 import {CitedSource, parseDocumentResource} from '../models/answer-trace.model';
 import {AppConfig} from '../models/app-config.model';
-import {CSVRow} from '../models/csv-row.model';
+import {CSVRow, extraColumns} from '../models/csv-row.model';
 import {ResultErrorCode, ResultRow, isScorableRow} from '../models/result-row.model';
 import {RowScoreError, ScorerRunResult, ScoringRequest} from '../scoring/scorer';
 import {ScorerRegistry} from '../scoring/scorer.registry';
@@ -300,23 +300,6 @@ export class EvalService {
             `FAILED: ${streamState.fullText.trim() || 'Assist operation failed.'}`;
       }
 
-      if (citations.length > 0 && !streamState.fullText.startsWith('SKIPPED:')) {
-        const trimmed = streamState.fullText.trimEnd();
-        streamState.fullText = trimmed + '\n\nSources:\n\n';
-        for (let i = 0; i < citations.length; i++) {
-          const cit = citations[i];
-          const index = i + 1;
-          if (cit.title && cit.uri && cit.title !== cit.uri) {
-            streamState.fullText += `[${index}] ${cit.title} - ${cit.uri}\n\n`;
-          } else if (cit.title) {
-            streamState.fullText += `[${index}] ${cit.title}\n\n`;
-          } else if (cit.uri) {
-            streamState.fullText += `[${index}] ${cit.uri}\n\n`;
-          }
-        }
-        streamState.fullText = streamState.fullText.trimEnd();
-      }
-
       const ttlt = Date.now() - streamState.startTime;
       const traceIdPromise =
           !traceId && assistToken && assistToken !== 'unknown' ?
@@ -360,6 +343,7 @@ export class EvalService {
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
         trace: {citedSources: citations},
+        inputColumns: extraColumns(row),
         traceId,
         traceUrl: this.getTraceUrl(traceId, projectId),
         connectorsUsed: grounding.connectorsUsed,
@@ -391,6 +375,7 @@ export class EvalService {
         turnId: sessionInfo?.turnId,
         // Whatever was cited before the failure is still evidence.
         trace: {citedSources: citations},
+        inputColumns: extraColumns(row),
         traceId,
         traceUrl: this.getTraceUrl(traceId, projectId),
         connectorsUsed: grounding.connectorsUsed,

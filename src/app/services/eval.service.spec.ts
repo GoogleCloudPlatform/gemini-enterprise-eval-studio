@@ -753,7 +753,7 @@ describe('EvalService', () => {
          expect(result.scorerResults).toEqual([]);
        });
 
-    it('should extract citations from groundingAttributions and embed in fetched text', async () => {
+    it('should extract citations from groundingAttributions and keep them out of the fetched text', async () => {
       mockBackendService.callAssistSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify([{
         answer: {
           replies: [{
@@ -783,9 +783,10 @@ describe('EvalService', () => {
         golden: 'my golden'
       });
 
-      expect(result.fetched).toContain('Here is the answer.');
-      expect(result.fetched).toContain('Sources:');
-      expect(result.fetched).toContain('[1] Doc 1 - https://example.com/1');
+      expect(result.fetched).toBe('Here is the answer.');
+      expect(result.trace?.citedSources.map(s => [s.title, s.uri])).toEqual([
+        ['Doc 1', 'https://example.com/1']
+      ]);
       expect(result.scorerResults[0].score).toBe(0.9);
     });
 
@@ -829,11 +830,12 @@ describe('EvalService', () => {
         golden: 'my golden'
       });
 
-      expect(result.fetched).toContain('[1] Ref 1 - https://example.com/ref1');
-      expect(result.fetched).not.toContain('[2]');
+      expect(result.trace?.citedSources.map(s => [s.title, s.uri])).toEqual([
+        ['Ref 1', 'https://example.com/ref1']
+      ]);
     });
 
-    it('should format citations when only title or uri is present or when equal', async () => {
+    it('should record citations that have only a title or only a uri', async () => {
       mockBackendService.callAssistSpy.and.returnValue(Promise.resolve(new Response(JSON.stringify([{
         answer: {
           replies: [{
@@ -862,10 +864,12 @@ describe('EvalService', () => {
         golden: 'my golden'
       });
 
-      expect(result.fetched).toContain('[1] Only Title');
-      expect(result.fetched).toContain('[2] https://only-uri.com');
-      expect(result.fetched).toContain('[3] https://same-uri.com');
-      expect(result.fetched).not.toContain('https://same-uri.com - https://same-uri.com');
+      expect(result.fetched).toBe('Answer.');
+      expect(result.trace?.citedSources.map(s => [s.title, s.uri])).toEqual([
+        ['Only Title', ''],
+        ['', 'https://only-uri.com'],
+        ['https://same-uri.com', 'https://same-uri.com'],
+      ]);
     });
 
     it('should extract citations when grounding metadata arrives in a later streaming chunk', async () => {
@@ -892,9 +896,42 @@ describe('EvalService', () => {
         golden: 'my golden'
       });
 
-      expect(result.fetched).toContain('First part.');
-      expect(result.fetched).toContain('[1] Doc 2 - https://example.com/2');
+      expect(result.fetched).toBe('First part.');
+      expect(result.trace?.citedSources.map(s => s.title)).toEqual(['Doc 2']);
     });
+
+    it('should carry the uploaded row\'s extra columns onto the result',
+       async () => {
+         mockBackendService.callAssistSpy.and.returnValue(fetched('answer'));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({
+           query: 'q',
+           golden: 'g',
+           expected_sources: 'dataStores:jira-prod',
+           owner: '',
+         });
+
+         expect(result.inputColumns)
+             .toEqual({expected_sources: 'dataStores:jira-prod', owner: ''});
+       });
+
+    it('should carry the extra columns onto a row whose request failed',
+       async () => {
+         mockBackendService.callAssistSpy.and.returnValue(
+             Promise.resolve(new Response('', {status: 500})));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow(
+             {query: 'q', golden: 'g', expected_sources: 'sources:Runbook'});
+
+         expect(result.fetched).toContain('Error:');
+         expect(result.inputColumns)
+             .toEqual({expected_sources: 'sources:Runbook'});
+         expect(result.trace).toEqual({citedSources: []});
+       });
 
     it('should record each cited document with its data store and connector on the trace',
        async () => {

@@ -93,6 +93,14 @@ export class CsvTableComponent implements OnChanges {
           exportedRow[col.errorHeader] = row[col.errorKey] ?? '';
         }
       }
+      // Input columns Eval Studio does not interpret (e.g. expected_sources)
+      // go back out under their original headers, without overwriting a
+      // column the table already exports.
+      for (const [header, value] of Object.entries(row.inputColumns ?? {})) {
+        if (!(header in exportedRow)) {
+          exportedRow[header] = value;
+        }
+      }
       if ('thoughts' in row) {
         exportedRow['Thoughts'] = row.thoughts || '';
       }

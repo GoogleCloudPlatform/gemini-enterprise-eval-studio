@@ -19,8 +19,9 @@ import {ChangeDetectorRef, Component, OnDestroy, OnInit} from '@angular/core';
 import {Subject} from 'rxjs';
 import {distinctUntilChanged, map, takeUntil} from 'rxjs/operators';
 
+import {traceCells} from '../../models/answer-trace.model';
 import {AppConfig} from '../../models/app-config.model';
-import {CSVRow} from '../../models/csv-row.model';
+import {CSVRow, extraColumns} from '../../models/csv-row.model';
 import {ResultRow, TRACE_COLUMN_TOOLTIP, isScorableRow} from '../../models/result-row.model';
 import {scoreColumnHeader, scoreErrorColumnHeader} from '../../scoring/score-columns';
 import {Scorer, ScorerRunResult, firstScorerError} from '../../scoring/scorer';
@@ -46,6 +47,24 @@ const BASE_COLUMNS: readonly ColumnDef[] = [
     key: 'connectorsUsed',
     exportHeader: 'connectors_used',
     truncate: true
+  },
+  // The answer trace: which documents, data stores and connectors backed the
+  // answer. Exported under the `cited*` names.
+  {
+    header: 'Sources',
+    exportHeader: 'citedSources',
+    key: 'citedSources',
+    truncate: true
+  },
+  {
+    header: 'Data stores',
+    exportHeader: 'citedDataStores',
+    key: 'citedDataStores'
+  },
+  {
+    header: 'Connectors',
+    exportHeader: 'citedConnectors',
+    key: 'citedConnectors'
   },
   {header: 'Conversation', key: 'conversationId', truncate: true},
   {header: 'Turn', key: 'turn', type: 'number'},
@@ -215,12 +234,13 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
   /**
    * Flattens `results` into `displayResults` against the current score
    * columns, so the table and the CSV export stay tabular. Leaves the columns
-   * themselves untouched.
+   * themselves untouched. A scorer that skipped a row shows a blank cell
+   * rather than a score of 0.
    */
   private refreshDisplayResults() {
     this.displayResults = this.results.map(row => {
       const {scorerResults, ...rest} = row;
-      const flat: Record<string, unknown> = {...rest};
+      const flat: Record<string, unknown> = {...rest, ...traceCells(row.trace)};
       for (const {id} of this.scorerColumns) {
         const result = scorerResults.find(r => r.scorerId === id);
         // A skipped or failed scorer has no score, so its cell stays blank
@@ -349,6 +369,7 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
                 scorerResults: [],
                 conversationId: row.conversationId,
                 turn: Number.isFinite(currentTurn) ? currentTurn : undefined,
+                inputColumns: extraColumns(row),
               };
               this.stateService.setResults(
                   results.filter((r): r is ResultRow => r !== undefined));

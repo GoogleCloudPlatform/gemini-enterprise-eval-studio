@@ -14,7 +14,52 @@
  * limitations under the License.
  */
 
-import {parseDocumentResource} from './answer-trace.model';
+import {CitedSource, parseDocumentResource, traceCells} from './answer-trace.model';
+
+/** A cited source with the given fields and the rest left empty. */
+function source(fields: Partial<CitedSource>): CitedSource {
+  return {
+    title: '',
+    uri: '',
+    document: '',
+    dataStore: '',
+    connector: '',
+    ...fields
+  };
+}
+
+describe('traceCells', () => {
+  it('should list each source and the distinct data stores and connectors',
+     () => {
+       expect(traceCells({
+         citedSources: [
+           source({
+             title: 'Refund Policy',
+             uri: 'https://wiki/refund',
+             dataStore: 'policies',
+             connector: 'confluence'
+           }),
+           source({
+             title: 'Refund FAQ',
+             dataStore: 'policies',
+             connector: 'confluence'
+           }),
+           source({uri: 'https://jira/1', dataStore: 'issues'}),
+         ],
+       })).toEqual({
+         citedSources:
+             'Refund Policy - https://wiki/refund\nRefund FAQ\nhttps://jira/1',
+         citedDataStores: 'policies, issues',
+         citedConnectors: 'confluence',
+       });
+     });
+
+  it('should give empty cells when nothing was cited', () => {
+    const empty = {citedSources: '', citedDataStores: '', citedConnectors: ''};
+    expect(traceCells({citedSources: []})).toEqual(empty);
+    expect(traceCells(undefined)).toEqual(empty);
+  });
+});
 
 describe('parseDocumentResource', () => {
   it('should read the data store and the connector collection', () => {

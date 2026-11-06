@@ -30,3 +30,25 @@ export interface CSVRow {
   turn?: string;
   [key: string]: string | undefined;
 }
+
+/** The input columns Eval Studio itself interprets. */
+const KNOWN_COLUMNS: ReadonlySet<string> =
+    new Set(['query', 'golden', 'conversationId', 'turn']);
+
+/**
+ * The input columns of a row other than the ones Eval Studio interprets
+ * itself, such as `expected_sources`, so they can travel with the result.
+ * Values that are not strings, such as the `__parsed_extra` list Papa Parse
+ * adds for a line with more fields than headers, are left out.
+ * @param row The uploaded row.
+ * @returns The extra columns by header, in input order.
+ */
+export function extraColumns(row: CSVRow): Record<string, string> {
+  const extras: Record<string, string> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (!KNOWN_COLUMNS.has(key) && typeof value === 'string') {
+      extras[key] = value;
+    }
+  }
+  return extras;
+}

@@ -18,6 +18,7 @@ import {HttpClientTestingModule} from '@angular/common/http/testing';
 import {ComponentFixture, TestBed, fakeAsync, tick} from '@angular/core/testing';
 import {BehaviorSubject, of} from 'rxjs';
 
+import {CitedSource} from '../../models/answer-trace.model';
 import {AppConfig} from '../../models/app-config.model';
 import {ResultRow, TRACE_COLUMN_TOOLTIP} from '../../models/result-row.model';
 import {ScoreResult, Scorer, ScorerRunResult, ScoringRequest} from '../../scoring/scorer';
@@ -28,6 +29,7 @@ import {EvalBackendService} from '../../services/eval-backend.service';
 import {EvalService} from '../../services/eval.service';
 import {StateService} from '../../services/state.service';
 import {MockAuthService, MockEvalBackendService} from '../../testing/mocks';
+import {CsvTableComponent} from '../shared/csv-table/csv-table.component';
 
 import {RunEvaluationComponent} from './run-evaluation.component';
 
@@ -1104,6 +1106,126 @@ describe('RunEvaluationComponent', () => {
          expect(component.displayResults[0]['score_first']).toBe(0);
          expect(component.displayResults[0]['score_second']).toBe('');
        });
+  });
+
+  describe('answer trace columns', () => {
+    /** A fetched row citing the given sources. */
+    function rowCiting(citedSources: CitedSource[]): ResultRow {
+      return {
+        query: 'q',
+        golden: 'g',
+        fetched: 'f',
+        ttft: 1,
+        ttfa: 2,
+        ttlt: 3,
+        scorerResults: [],
+        trace: {citedSources},
+      };
+    }
+
+    const REFUND_POLICY: CitedSource = {
+      title: 'Refund Policy',
+      uri: 'https://wiki/refund',
+      document: 'projects/p/locations/global/collections/confluence/' +
+          'dataStores/policies/branches/0/documents/refund',
+      dataStore: 'policies',
+      connector: 'confluence',
+    };
+
+    /** The rows the results table would export, by CSV header. */
+    function exportedRows(component: RunEvaluationComponent):
+        Array<Record<string, unknown>> {
+      const csvService = jasmine.createSpyObj<CsvService>('CsvService', ['exportCSV']);
+      const table = new CsvTableComponent(csvService);
+      table.data = component.displayResults;
+      table.columns = component.columns;
+      table.exportResults();
+      return csvService.exportCSV.calls.mostRecent().args[0] as
+          Array<Record<string, unknown>>;
+    }
+
+    it('should show the cited sources, data stores and connectors after the answer',
+       () => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         resultsSubject.next([rowCiting([REFUND_POLICY])]);
+
+         const headers = component.columns.map(c => c.header);
+         const positions = ['Fetched', 'Sources', 'Data stores', 'Connectors']
+                               .map(header => headers.indexOf(header));
+         expect(positions).not.toContain(-1);
+         expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+         expect(component.displayResults[0]['citedSources'])
+             .toBe('Refund Policy - https://wiki/refund');
+         expect(component.displayResults[0]['citedDataStores'])
+             .toBe('policies');
+         expect(component.displayResults[0]['citedConnectors'])
+             .toBe('confluence');
+       });
+
+    it('should export the citation columns, blank for a row citing nothing, with the input columns',
+       () => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         resultsSubject.next([
+           {
+             ...rowCiting([REFUND_POLICY]),
+             inputColumns: {expected_sources: 'connectors:confluence'}
+           },
+           {...rowCiting([]), inputColumns: {expected_sources: ''}},
+         ]);
+
+         const [citing, citingNothing] = exportedRows(component);
+         expect(citing['citedSources'])
+             .toBe('Refund Policy - https://wiki/refund');
+         expect(citing['citedDataStores']).toBe('policies');
+         expect(citing['citedConnectors']).toBe('confluence');
+         expect(citing['expected_sources']).toBe('connectors:confluence');
+         expect(citing['Sources']).toBeUndefined();
+         expect(citingNothing['citedSources']).toBe('');
+         expect(citingNothing['citedDataStores']).toBe('');
+         expect(citingNothing['citedConnectors']).toBe('');
+         expect(Object.keys(citingNothing)).toEqual(Object.keys(citing));
+       });
+
+    it('should carry the input columns onto rows skipped for a broken turn sequence',
+       fakeAsync(() => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         // A conversation that does not start at turn 0 or 1 is skipped whole.
+         component.startEvaluation({
+           file: new File([], 'test.csv'),
+           rows: [
+             {
+               query: 'q2',
+               golden: 'g',
+               conversationId: 'conv',
+               turn: '2',
+               expected_sources: 'sources:Runbook'
+             },
+             {
+               query: 'q3',
+               golden: 'g',
+               conversationId: 'conv',
+               turn: '3',
+               expected_sources: ''
+             },
+           ],
+         });
+         tick();
+
+         expect(mockEvalService.processRow).not.toHaveBeenCalled();
+         expect(resultsSubject.value.map(r => r.inputColumns)).toEqual([
+           {expected_sources: 'sources:Runbook'},
+           {expected_sources: ''},
+         ]);
+       }));
   });
 
   describe('startReRate', () => {
