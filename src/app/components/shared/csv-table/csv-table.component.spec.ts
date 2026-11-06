@@ -42,6 +42,25 @@ describe('CsvTableComponent', () => {
   }
 
   describe('exportResults', () => {
+    it('should name columns by exportHeader when set, else by header', () => {
+      component.columns = [
+        {header: 'Query', key: 'query'},
+        {
+          header: 'Connectors Used',
+          key: 'connectorsUsed',
+          exportHeader: 'connectors_used'
+        },
+      ];
+      component.data = [{query: 'q1', connectorsUsed: 'JIRA, Web Search'}];
+
+      component.exportResults();
+
+      expect(exportCSV).toHaveBeenCalledTimes(1);
+      expect(exportedRows()).toEqual([
+        {'Query': 'q1', 'connectors_used': 'JIRA, Web Search'}
+      ]);
+    });
+
     it('should export the agent ID alongside the engine ID', () => {
       component.data = [{query: 'q', engineId: 'engine', agentId: 'support-bot'}];
 

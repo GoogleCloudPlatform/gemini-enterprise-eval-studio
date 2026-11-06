@@ -219,7 +219,10 @@
                 *ngFor="let option of filteredConnectors()"
                 class="flex flex-col hover:bg-blue-50 rounded transition-colors"
               >
-                <label class="text-sm text-gray-700 flex items-center justify-between p-1.5 w-full cursor-pointer select-none">
+                <label
+                  [title]="connectorIdHint(option)"
+                  class="text-sm text-gray-700 flex items-center justify-between p-1.5 w-full cursor-pointer select-none"
+                >
                   <div class="flex items-center gap-2">
                     <input
                       type="checkbox"

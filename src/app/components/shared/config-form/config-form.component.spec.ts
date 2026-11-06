@@ -462,6 +462,36 @@ describe('ConfigFormComponent', () => {
     });
   });
 
+  describe('connectorIdHint', () => {
+    it('should name the connector id to use in connectors_override', () => {
+      expect(component.connectorIdHint({
+        id: 'JIRA',
+        displayName: 'Jira',
+        entityIds: ['jira-issues'],
+        searchableDataStoreIds: ['jira-issues'],
+      })).toBe('connectors_override id: JIRA');
+    });
+
+    it('should name web_search for the Web Search option', () => {
+      expect(component.connectorIdHint({
+        id: 'Web Search',
+        displayName: 'Web Search',
+        entityIds: [],
+        searchableDataStoreIds: [],
+      })).toBe('connectors_override id: web_search');
+    });
+
+    it('should say a connector without searchable data stores is not available',
+       () => {
+         expect(component.connectorIdHint({
+           id: 'NOTION',
+           displayName: 'Notion',
+           entityIds: ['notion-ds'],
+           searchableDataStoreIds: [],
+         })).toBe('connectors_override: not available (not authorized)');
+       });
+  });
+
   describe('fetchEngines', () => {
     it('should set error message if project ID is missing', () => {
       component.config.projectId = '';

@@ -18,7 +18,7 @@ import {AppConfig} from '../models/app-config.model';
 import {ConnectorOption} from '../models/connector.model';
 import {CSVRow} from '../models/csv-row.model';
 
-import {resolveRowConfig, resolveRowGrounding} from './row-config.util';
+import {connectorOverrideId, hasConnectorsOverrideColumn, resolveRowConfig, resolveRowGrounding} from './row-config.util';
 
 const CONFIG: AppConfig = {
   projectId: 'project',
@@ -216,5 +216,31 @@ describe('resolveRowGrounding', () => {
     expect(resolveRowGrounding(rowWith('typo'), config, CONNECTORS)
                .searchAllDataStores)
         .toBeFalse();
+  });
+});
+
+describe('connectorOverrideId', () => {
+  it('returns web_search for the Web Search connector', () => {
+    expect(connectorOverrideId(CONNECTORS[3])).toBe('web_search');
+  });
+
+  it('returns the connector id for other connectors', () => {
+    expect(connectorOverrideId(CONNECTORS[1])).toBe('SERVICENOW');
+  });
+
+  it('returns undefined for a connector without searchable data stores', () => {
+    expect(connectorOverrideId(CONNECTORS[2])).toBeUndefined();
+  });
+});
+
+describe('hasConnectorsOverrideColumn', () => {
+  it('is true when a row has the column, even if blank', () => {
+    expect(hasConnectorsOverrideColumn([{query: 'q', connectors_override: ''}]))
+        .toBeTrue();
+  });
+
+  it('is false when no row has the column', () => {
+    expect(hasConnectorsOverrideColumn([{query: 'q'}])).toBeFalse();
+    expect(hasConnectorsOverrideColumn([])).toBeFalse();
   });
 });

@@ -28,6 +28,7 @@ import {ScorerRegistry} from '../../scoring/scorer.registry';
 import {ScorerSelection} from '../../scoring/scorer-selection';
 import {EvalService} from '../../services/eval.service';
 import {StateService} from '../../services/state.service';
+import {CONNECTORS_OVERRIDE_INSTRUCTION, hasConnectorsOverrideColumn} from '../../utils/row-config.util';
 import {ConfigFormComponent} from '../shared/config-form/config-form.component';
 import {ColumnDef, CsvTableComponent} from '../shared/csv-table/csv-table.component';
 import {FileUploadComponent} from '../shared/file-upload/file-upload.component';
@@ -40,7 +41,12 @@ const MAX_CONCURRENT_REQUESTS_FOR_EVALUATION = 5;
 const BASE_COLUMNS: readonly ColumnDef[] = [
   {header: 'Query', key: 'query', truncate: true},
   {header: 'Golden', key: 'golden', type: 'markdown', truncate: true},
-  {header: 'Fetched', key: 'fetched', type: 'markdown', truncate: true},
+  {header: 'Fetched', key: 'fetched', type: 'markdown', truncate: true}, {
+    header: 'Connectors Used',
+    key: 'connectorsUsed',
+    exportHeader: 'connectors_used',
+    truncate: true
+  },
   {header: 'Conversation', key: 'conversationId', truncate: true},
   {header: 'Turn', key: 'turn', type: 'number'},
   {header: 'TTFT (s)', key: 'ttft', type: 'number'},
@@ -90,6 +96,11 @@ function sameIds(
   templateUrl: './run-evaluation.component.html'
 })
 export class RunEvaluationComponent implements OnInit, OnDestroy {
+  /** Instruction shown on the upload step. */
+  readonly uploadInstruction =
+      `CSV file with required 'query' and 'golden' columns (plus optional ` +
+      `'conversation_id' and consecutive 'turn' columns starting at 0 or 1 ` +
+      `for multi-turn evaluation, and ${CONNECTORS_OVERRIDE_INSTRUCTION})`;
   step = 1;
   isProcessing = false;
   progress = 0;
@@ -122,7 +133,8 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
 
   /**
    * Every column the results table can show. `columns` hides the
-   * conversation and turn columns for single-turn runs.
+   * conversation and turn columns for single-turn runs, and the connectors
+   * column unless the upload has a `connectors_override` column.
    */
   private allColumns: ColumnDef[] = [...BASE_COLUMNS, TRACE_COLUMN];
 
@@ -141,10 +153,17 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
             r => Boolean(r.conversationId?.trim() || r.turn?.trim())) ||
         this.results.some(
             r => r.conversationId !== undefined || r.turn !== undefined);
-    return hasMultiTurn ?
-        this.allColumns :
-        this.allColumns.filter(
-            c => c.key !== 'conversationId' && c.key !== 'turn');
+    const hasConnectorsOverride =
+        hasConnectorsOverrideColumn(this.uploadedRows);
+    return this.allColumns.filter(c => {
+      if (c.key === 'conversationId' || c.key === 'turn') {
+        return hasMultiTurn;
+      }
+      if (c.key === 'connectorsUsed') {
+        return hasConnectorsOverride;
+      }
+      return true;
+    });
   }
 
   constructor(

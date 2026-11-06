@@ -31,6 +31,7 @@ import {apiErrorMessage} from '../../../services/api-error';
 import {AuthService} from '../../../services/auth.service';
 import {EvalBackendService} from '../../../services/eval-backend.service';
 import {StateService} from '../../../services/state.service';
+import {CONNECTORS_OVERRIDE_COLUMN, connectorOverrideId} from '../../../utils/row-config.util';
 import {InfoTooltipComponent} from '../../shared/info-tooltip/info-tooltip.component';
 import {ScoringSetupComponent} from '../../shared/scoring-setup/scoring-setup.component';
 
@@ -677,6 +678,20 @@ export class ConfigFormComponent implements OnInit, OnDestroy {
    */
   getSelectedEngine(): Engine|undefined {
     return this.engines.find(e => e.name === this.config.selectedEngine);
+  }
+
+  /**
+   * Builds the tooltip for a connector in the dropdown, naming the entry to
+   * use in a CSV `connectors_override` column.
+   *
+   * @param connector The dropdown option.
+   * @returns The tooltip text.
+   */
+  connectorIdHint(connector: ConnectorOption): string {
+    const id = connectorOverrideId(connector);
+    return id == null ?
+        `${CONNECTORS_OVERRIDE_COLUMN}: not available (not authorized)` :
+        `${CONNECTORS_OVERRIDE_COLUMN} id: ${id}`;
   }
 
   /**

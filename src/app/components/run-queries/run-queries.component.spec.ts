@@ -256,4 +256,59 @@ describe('RunQueriesComponent', () => {
        expect(exportedData[1]['Error Code']).toBe('');
        expect(exportedData[2]['Error Code']).toBe('HTTP_500');
      }));
+
+  it('should describe connectors_override in the upload instruction', () => {
+    const component =
+        TestBed.createComponent(RunQueriesComponent).componentInstance;
+
+    expect(component.uploadInstruction).toContain('connectors_override');
+    expect(component.uploadInstruction).toContain('Configuration step');
+  });
+
+  it('should show the Connectors Used column only when the upload has a connectors_override column',
+     () => {
+       const component =
+           TestBed.createComponent(RunQueriesComponent).componentInstance;
+
+       component.responseCsvRows = [{query: 'q1'}];
+       expect(component.columns.map(c => c.key))
+           .not.toContain('connectorsUsed');
+
+       component.responseCsvRows = [{query: 'q1', connectors_override: ''}];
+       const column =
+           component.columns.find(c => c.key === 'connectorsUsed');
+       expect(column?.header).toBe('Connectors Used');
+       expect(column?.exportHeader).toBe('connectors_used');
+     });
+
+  it('should forward the connectors_override cell to processRow without a golden',
+     fakeAsync(() => {
+       const component =
+           TestBed.createComponent(RunQueriesComponent).componentInstance;
+       mockEvalService.processRow.and.callFake(async row => ({
+                                                 query: row.query,
+                                                 golden: row.golden,
+                                                 fetched: 'answer',
+                                                 ttft: 0,
+                                                 ttfa: 0,
+                                                 ttlt: 0,
+                                                 scorerResults: [],
+                                                 connectorsUsed: 'JIRA',
+                                               }));
+
+       component.startResponseGeneration({
+         file: new File([], 'test.csv'),
+         rows: [{query: 'q1', connectors_override: 'JIRA;web_search'}],
+       });
+       tick();
+
+       expect(mockEvalService.processRow).toHaveBeenCalledTimes(1);
+       const row: CSVRow = mockEvalService.processRow.calls.mostRecent().args[0];
+       expect(row).toEqual({
+         query: 'q1',
+         golden: '',
+         connectors_override: 'JIRA;web_search',
+       });
+       expect(component.responseResults[0]['connectorsUsed']).toBe('JIRA');
+     }));
 });

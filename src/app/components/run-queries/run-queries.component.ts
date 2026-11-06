@@ -17,10 +17,12 @@
 import {CommonModule} from '@angular/common';
 import {ChangeDetectorRef, Component} from '@angular/core';
 
+import {CSVRow} from '../../models/csv-row.model';
 import {TRACE_COLUMN_TOOLTIP} from '../../models/result-row.model';
 import {CsvService} from '../../services/csv.service';
 import {EvalService} from '../../services/eval.service';
 import {StateService} from '../../services/state.service';
+import {CONNECTORS_OVERRIDE_COLUMN, CONNECTORS_OVERRIDE_INSTRUCTION, hasConnectorsOverrideColumn} from '../../utils/row-config.util';
 import {ConfigFormComponent} from '../shared/config-form/config-form.component';
 import {ColumnDef, CsvTableComponent} from '../shared/csv-table/csv-table.component';
 import {FileUploadComponent} from '../shared/file-upload/file-upload.component';
@@ -42,10 +44,19 @@ const MAX_CONCURRENT_REQUESTS_FOR_QUERIES = 5;
   templateUrl: './run-queries.component.html'
 })
 export class RunQueriesComponent {
+  /** Instruction shown on the upload step. */
+  readonly uploadInstruction =
+      `CSV file with at least 'query' column (plus ${
+          CONNECTORS_OVERRIDE_INSTRUCTION})`;
   step = 1;
-  columns: ColumnDef[] = [
+  private readonly allColumns: ColumnDef[] = [
     {header: 'Query', key: 'query', truncate: true},
-    {header: 'Response', key: 'response', type: 'markdown', truncate: true},
+    {header: 'Response', key: 'response', type: 'markdown', truncate: true}, {
+      header: 'Connectors Used',
+      key: 'connectorsUsed',
+      exportHeader: 'connectors_used',
+      truncate: true
+    },
     {header: 'TTFT (s)', key: 'ttft', type: 'number'},
     {header: 'TTFA (s)', key: 'ttfa', type: 'number'},
     {header: 'TTLT (s)', key: 'ttlt', type: 'number'}, {
@@ -57,6 +68,13 @@ export class RunQueriesComponent {
       tooltipAlign: 'right'
     }
   ];
+
+  get columns(): ColumnDef[] {
+    return hasConnectorsOverrideColumn(this.responseCsvRows) ?
+        this.allColumns :
+        this.allColumns.filter(c => c.key !== 'connectorsUsed');
+  }
+
   responseFile: File|null = null;
   responseCsvRows: Array<Record<string, string>> = [];
   responseResults: any[] = [];
@@ -141,7 +159,12 @@ export class RunQueriesComponent {
     const tasks = this.responseCsvRows.map((row, rowIndex) => async () => {
       if (runId !== this.currentRunId || !this.isProcessingResponse) return;
 
-      const csvRow: any = {query: row['query']};
+      // No golden, so processRow only generates the response.
+      const csvRow: CSVRow = {
+        query: row['query'] ?? '',
+        golden: '',
+        [CONNECTORS_OVERRIDE_COLUMN]: row[CONNECTORS_OVERRIDE_COLUMN],
+      };
       const result = await this.evalService.processRow(
           csvRow, undefined, undefined, runConfig);
       if (runId !== this.currentRunId || !this.isProcessingResponse) return;
@@ -149,6 +172,7 @@ export class RunQueriesComponent {
       results[rowIndex] = {
         query: result.query,
         response: result.fetched,
+        connectorsUsed: result.connectorsUsed,
         thoughts: result.thoughts,
         errorCode: result.errorCode,
         ttft: result.ttft,

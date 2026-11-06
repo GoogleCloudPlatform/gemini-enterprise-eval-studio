@@ -46,6 +46,8 @@ export interface ColumnDef {
   width?: string;
   tooltip?: string;
   tooltipAlign?: 'left'|'right';
+  /** Header used in the exported CSV. Defaults to `header`. */
+  exportHeader?: string;
 }
 
 @Component({
@@ -84,9 +86,9 @@ export class CsvTableComponent implements OnChanges {
     const exportedData = this.data.map(row => {
       const exportedRow: Record<string, any> = {};
       for (const col of this.columns) {
-        exportedRow[col.header] = col.type === 'link' && col.hrefKey ?
-            row[col.hrefKey] :
-            row[col.key];
+        exportedRow[col.exportHeader ?? col.header] =
+            col.type === 'link' && col.hrefKey ? row[col.hrefKey] :
+                                                 row[col.key];
         if (col.errorHeader && col.errorKey) {
           exportedRow[col.errorHeader] = row[col.errorKey] ?? '';
         }

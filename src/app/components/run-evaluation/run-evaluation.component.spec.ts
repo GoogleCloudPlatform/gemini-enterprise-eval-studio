@@ -1881,4 +1881,31 @@ describe('RunEvaluationComponent', () => {
     expect(exportedData[1]['Error Code']).toBe('');
     expect(exportedData[2]['Error Code']).toBe('HTTP_500');
   });
+
+  it('should describe connectors_override in the upload instruction', () => {
+    const component =
+        TestBed.createComponent(RunEvaluationComponent).componentInstance;
+
+    expect(component.uploadInstruction).toContain('connectors_override');
+    expect(component.uploadInstruction).toContain('Configuration step');
+  });
+
+  it('should show the Connectors Used column only when the upload has a connectors_override column',
+     () => {
+       const fixture = TestBed.createComponent(RunEvaluationComponent);
+       const component = fixture.componentInstance;
+       fixture.detectChanges();
+
+       component.uploadedRows = [{query: 'q1', golden: 'g1'}];
+       expect(component.columns.map(c => c.key))
+           .not.toContain('connectorsUsed');
+
+       component.uploadedRows = [
+         {query: 'q1', golden: 'g1', connectors_override: ''},
+       ];
+       const column =
+           component.columns.find(c => c.key === 'connectorsUsed');
+       expect(column?.header).toBe('Connectors Used');
+       expect(column?.exportHeader).toBe('connectors_used');
+     });
 });

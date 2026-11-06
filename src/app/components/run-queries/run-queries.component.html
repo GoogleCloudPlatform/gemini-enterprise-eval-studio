@@ -57,7 +57,7 @@
       [(csvRows)]="responseCsvRows"
       (prev)="prevStep()"
       (run)="startResponseGeneration($event)"
-      [instruction]="'CSV file with at least \'query\' column'"
+      [instruction]="uploadInstruction"
       [buttonText]="'Run Queries'"
       [requiredColumns]="['query']"
     ></app-file-upload>

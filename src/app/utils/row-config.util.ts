@@ -23,8 +23,14 @@ import {parseListCell} from './list-cell.util';
 /** Input column that overrides the global connector selection for a row. */
 export const CONNECTORS_OVERRIDE_COLUMN = 'connectors_override';
 
+/** Upload instruction describing the optional `connectors_override` column. */
+export const CONNECTORS_OVERRIDE_INSTRUCTION =
+    `an optional '${CONNECTORS_OVERRIDE_COLUMN}' column: connector ids ` +
+    `separated by ';', 'web_search' for Web Search, '[]' for none, or blank ` +
+    `to use the connectors chosen in the Configuration step`;
+
 /** Entry of `connectors_override` that turns on web grounding. */
-const WEB_SEARCH_TOKEN = 'web_search';
+export const WEB_SEARCH_TOKEN = 'web_search';
 
 /** Value of `connectors_override` that turns off every connector. */
 const NO_CONNECTORS = '[]';
@@ -34,6 +40,35 @@ const NO_CONNECTORS_LABEL = '(none)';
 
 /** Label for a row that searched every data store of the engine. */
 const ALL_DATA_STORES_LABEL = '(all engine data stores)';
+
+/**
+ * Returns the entry to write in `connectors_override` to select `connector`.
+ *
+ * @param connector A connector offered by the selected engine.
+ * @returns `web_search` for Web Search, the connector id for a connector with
+ *     searchable data stores, or `undefined` for a connector a row cannot use
+ *     (such as one that is not authorized), since naming it would only be
+ *     flagged `(not found)`.
+ */
+export function connectorOverrideId(connector: ConnectorOption): string|
+    undefined {
+  if (connector.id === WEB_SEARCH_CONNECTOR_ID) {
+    return WEB_SEARCH_TOKEN;
+  }
+  return connector.searchableDataStoreIds.length > 0 ? connector.id :
+                                                       undefined;
+}
+
+/**
+ * Returns whether any uploaded row has a `connectors_override` column.
+ *
+ * @param rows The parsed rows of an uploaded CSV file.
+ * @returns True if the column is present, even when every cell is blank.
+ */
+export function hasConnectorsOverrideColumn(
+    rows: ReadonlyArray<Record<string, unknown>>): boolean {
+  return rows.some(row => CONNECTORS_OVERRIDE_COLUMN in row);
+}
 
 /** What a row asked for, before connector ids are expanded. */
 export interface RowConfig {
