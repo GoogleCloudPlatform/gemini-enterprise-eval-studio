@@ -16,6 +16,8 @@
 
 import {ScorerRunResult} from '../scoring/scorer';
 
+import {AnswerTrace} from './answer-trace.model';
+
 /**
  * Tooltip text for the Trace column header explaining trace persistence delay.
  */
@@ -69,6 +71,12 @@ export interface ResultRow {
    * and error. Empty when the row was not scored (see `isScorableRow`).
    */
   scorerResults: ScorerRunResult[];
+  /**
+   * The evidence the agent cited behind `fetched`. `EvalService.processRow`
+   * sets it on every row it returns, with no cited sources when the agent
+   * cited nothing.
+   */
+  trace?: AnswerTrace;
   assistToken?: string;
   projectId?: string;
   region?: string;

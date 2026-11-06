@@ -17,6 +17,7 @@
 import {Injectable} from '@angular/core';
 
 import {agentIdFromResourceName} from '../models/agent.model';
+import {CitedSource, parseDocumentResource} from '../models/answer-trace.model';
 import {AppConfig} from '../models/app-config.model';
 import {CSVRow} from '../models/csv-row.model';
 import {ResultErrorCode, ResultRow, isScorableRow} from '../models/result-row.model';
@@ -183,7 +184,7 @@ export class EvalService {
     let errorCode: ResultErrorCode = '';
     let traceId: string|undefined;
     let sessionInfo: SessionInfo|undefined;
-    const citations: Array<{title?: string; uri?: string}> = [];
+    const citations: CitedSource[] = [];
     const seenCitations = new Set<string>();
 
     try {
@@ -358,6 +359,7 @@ export class EvalService {
         agentId,
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
+        trace: {citedSources: citations},
         traceId,
         traceUrl: this.getTraceUrl(traceId, projectId),
         connectorsUsed: grounding.connectorsUsed,
@@ -387,6 +389,8 @@ export class EvalService {
         agentId,
         session: sessionInfo?.session ?? session,
         turnId: sessionInfo?.turnId,
+        // Whatever was cited before the failure is still evidence.
+        trace: {citedSources: citations},
         traceId,
         traceUrl: this.getTraceUrl(traceId, projectId),
         connectorsUsed: grounding.connectorsUsed,
@@ -531,13 +535,16 @@ export class EvalService {
 
   /**
    * Extracts citations from an item in the streamAssist response.
+   *
+   * Citations are read from every reply, including replies that carry
+   * grounding metadata but no answer text.
    * @param item The parsed item from streamAssist stream.
    * @param citations Array to accumulate unique citations.
    * @param seen Set of citation keys to prevent duplicates.
    */
   private extractCitations(
       item: any,
-      citations: Array<{title?: string; uri?: string}>,
+      citations: CitedSource[],
       seen: Set<string>,
   ): void {
     if (!item) return;
@@ -548,15 +555,22 @@ export class EvalService {
       return;
     }
 
-    const addCitation = (title?: string, uri?: string) => {
+    const addCitation = (title?: string, uri?: string, document?: string) => {
       const cleanTitle = typeof title === 'string' ? title.trim() : '';
       const cleanUri = typeof uri === 'string' ? uri.trim() : '';
-      if (!cleanTitle && !cleanUri) return;
+      const cleanDocument =
+          typeof document === 'string' ? document.trim() : '';
+      if (!cleanTitle && !cleanUri && !cleanDocument) return;
 
-      const key = `${cleanUri}::${cleanTitle}`;
+      const key = `${cleanDocument}::${cleanUri}::${cleanTitle}`;
       if (!seen.has(key)) {
         seen.add(key);
-        citations.push({title: cleanTitle, uri: cleanUri});
+        citations.push({
+          title: cleanTitle,
+          uri: cleanUri,
+          document: cleanDocument,
+          ...parseDocumentResource(cleanDocument),
+        });
       }
     };
 
@@ -576,7 +590,8 @@ export class EvalService {
         }
       }
 
-      // 2. textGroundingMetadata.references (documentMetadata: {title, uri})
+      // 2. textGroundingMetadata.references
+      //    (documentMetadata: {title, uri, document})
       const references = obj.textGroundingMetadata?.references ||
           obj.groundingMetadata?.references;
       if (Array.isArray(references)) {
@@ -586,7 +601,8 @@ export class EvalService {
           } else if (ref) {
             addCitation(
                 ref.documentMetadata?.title || ref.title,
-                ref.documentMetadata?.uri || ref.uri);
+                ref.documentMetadata?.uri || ref.uri,
+                ref.documentMetadata?.document || ref.document);
           }
         }
       }

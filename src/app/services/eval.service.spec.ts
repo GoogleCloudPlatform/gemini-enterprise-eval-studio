@@ -896,6 +896,239 @@ describe('EvalService', () => {
       expect(result.fetched).toContain('[1] Doc 2 - https://example.com/2');
     });
 
+    it('should record each cited document with its data store and connector on the trace',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([{
+               answer: {
+                 replies: [{
+                   groundedContent: {
+                     content: {text: 'Refunds take 30 days.'},
+                     textGroundingMetadata: {
+                       references: [
+                         {
+                           documentMetadata: {
+                             title: 'Refund Policy',
+                             uri: 'https://wiki/refund',
+                             document:
+                                 'projects/p/locations/global/collections/confluence-policies/dataStores/confluence-policies_page/branches/0/documents/refund',
+                           },
+                         },
+                         {
+                           documentMetadata: {
+                             title: 'Uploaded Notes',
+                             uri: 'gs://bucket/notes.pdf',
+                             document:
+                                 'projects/p/locations/global/collections/default_collection/dataStores/uploads/branches/0/documents/notes',
+                           },
+                         },
+                       ],
+                     },
+                   },
+                 }],
+               },
+             }])));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.trace).toEqual({
+           citedSources: [
+             {
+               title: 'Refund Policy',
+               uri: 'https://wiki/refund',
+               document:
+                   'projects/p/locations/global/collections/confluence-policies/dataStores/confluence-policies_page/branches/0/documents/refund',
+               dataStore: 'confluence-policies_page',
+               connector: 'confluence-policies',
+             },
+             {
+               title: 'Uploaded Notes',
+               uri: 'gs://bucket/notes.pdf',
+               document:
+                   'projects/p/locations/global/collections/default_collection/dataStores/uploads/branches/0/documents/notes',
+               dataStore: 'uploads',
+               connector: '',
+             },
+           ],
+         });
+       });
+
+    it('should capture citations from a reply that carries references but no answer text',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([
+               {answer: {replies: [{groundedContent: {content: {text: 'A'}}}]}},
+               {
+                 answer: {
+                   replies: [{
+                     groundedContent: {
+                       textGroundingMetadata: {
+                         references: [{
+                           documentMetadata: {
+                             title: 'Runbook v2',
+                             document:
+                                 'projects/p/locations/global/collections/jira-prod/dataStores/jira-prod_issue/branches/0/documents/1',
+                           },
+                         }],
+                       },
+                     },
+                   }],
+                 },
+               },
+             ])));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.trace?.citedSources.map(source => source.title))
+             .toEqual(['Runbook v2']);
+         expect(result.trace?.citedSources[0].connector).toBe('jira-prod');
+       });
+
+    it('should record an empty trace when the agent cites nothing', async () => {
+      mockBackendService.callAssistSpy.and.returnValue(fetched('answer'));
+      spyOn(service['stateService'], 'getCurrentConfig').and.returnValue(config);
+
+      const result = await service.processRow({query: 'q', golden: 'g'});
+
+      expect(result.trace).toEqual({citedSources: []});
+    });
+
+    it('should keep the citations collected before a failure on the trace',
+       async () => {
+         let chunkSent = false;
+         const stream = new ReadableStream({
+           pull(controller) {
+             if (!chunkSent) {
+               chunkSent = true;
+               const chunk =
+                   '[{"answer":{"replies":[{"groundedContent":{"textGroundingMetadata":{"references":[{"documentMetadata":{"title":"Doc","uri":"https://example.com/doc"}}]}}}]}}';
+               controller.enqueue(new TextEncoder().encode(chunk));
+             } else {
+               controller.error(new Error('Stream disconnected'));
+             }
+           }
+         });
+         mockBackendService.callAssistSpy.and.returnValue(
+             Promise.resolve(new Response(stream)));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.fetched).toContain('Error:');
+         expect(result.trace?.citedSources.map(source => source.uri))
+             .toEqual(['https://example.com/doc']);
+       });
+
+    it('should record a document cited several times on the trace once',
+       async () => {
+         const refund = {
+           title: 'Refund Policy',
+           uri: 'https://wiki/refund',
+           document:
+               'projects/p/locations/global/collections/default_collection/dataStores/policies/branches/0/documents/refund',
+         };
+         // The same document cited twice in one reply and again, with
+         // surrounding whitespace, in a later chunk.
+         const stream = new ReadableStream({
+           start(controller) {
+             const chunk1 = JSON.stringify([{
+               answer: {
+                 replies: [{
+                   groundedContent: {
+                     content: {text: 'Refunds take 30 days.'},
+                     textGroundingMetadata: {
+                       references: [
+                         {documentMetadata: refund},
+                         {documentMetadata: refund},
+                       ],
+                     },
+                   },
+                 }],
+               },
+             }]).slice(0, -1);
+             const chunk2 = ',' + JSON.stringify({
+               answer: {
+                 replies: [{
+                   groundedContent: {
+                     textGroundingMetadata: {
+                       references: [{
+                         documentMetadata: {
+                           title: ` ${refund.title} `,
+                           uri: refund.uri,
+                           document: refund.document,
+                         },
+                       }],
+                     },
+                   },
+                 }],
+               },
+             }) + ']';
+             controller.enqueue(new TextEncoder().encode(chunk1));
+             controller.enqueue(new TextEncoder().encode(chunk2));
+             controller.close();
+           }
+         });
+         mockBackendService.callAssistSpy.and.returnValue(
+             Promise.resolve(new Response(stream)));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.trace?.citedSources).toEqual([{
+           ...refund,
+           dataStore: 'policies',
+           connector: '',
+         }]);
+       });
+
+    it('should keep citations that differ in title, uri or document as separate entries',
+       async () => {
+         mockBackendService.callAssistSpy.and.resolveTo(
+             new Response(JSON.stringify([{
+               answer: {
+                 replies: [{
+                   groundedContent: {
+                     content: {text: 'answer'},
+                     textGroundingMetadata: {
+                       references: [
+                         {documentMetadata: {title: 'Runbook', uri: 'https://a'}},
+                         {documentMetadata: {title: 'Runbook', uri: 'https://b'}},
+                         {
+                           documentMetadata: {
+                             title: 'Runbook',
+                             uri: 'https://a',
+                             document:
+                                 'projects/p/locations/global/collections/jira/dataStores/issues/branches/0/documents/1',
+                           },
+                         },
+                         {documentMetadata: {title: 'Runbook v2', uri: 'https://a'}},
+                       ],
+                     },
+                   },
+                 }],
+               },
+             }])));
+         spyOn(service['stateService'], 'getCurrentConfig')
+             .and.returnValue(config);
+
+         const result = await service.processRow({query: 'q', golden: 'g'});
+
+         expect(result.trace?.citedSources.map(
+                    s => [s.title, s.uri, s.dataStore]))
+             .toEqual([
+               ['Runbook', 'https://a', ''],
+               ['Runbook', 'https://b', ''],
+               ['Runbook', 'https://a', 'issues'],
+               ['Runbook v2', 'https://a', ''],
+             ]);
+       });
+
     it('should construct traceUrl when assistToken is returned and fetchTraceId succeeds',
        async () => {
          mockBackendService.callAssistSpy.and.resolveTo(
