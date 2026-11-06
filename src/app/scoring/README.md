@@ -2,10 +2,14 @@
 
 Every evaluated row without an `errorCode` is scored by a **scorer**: a strategy
 that turns a query, the agent's response and (optionally) a golden answer into a
-normalized score between `0.0` and `1.0`. Rows with a non-empty `errorCode`
+normalized score between `0.0` and `1.0`. Scorers also receive the row's answer
+trace (the documents, data stores and connectors the agent cited) and its
+`expected_sources` cell, so they can judge where an answer came from as well as
+how it is worded. Rows with a non-empty `errorCode`
 (`SKIPPED`, `FAILED`, `ERROR`, `INVALID_TURN_ID`, or `SESSION_FAILED`) are not
 scored, and their score cells are left blank in the results table and CSV export
-(as are entries skipped by a scorer when a required `golden` answer is missing).
+(as are entries a scorer skips, such as when a required `golden` answer is
+missing).
 `EvalService` enforces the `0.0` to `1.0` range: a scorer that returns anything
 else is reported as failed for that row rather than stored.
 
@@ -73,6 +77,10 @@ Override these on your scorer when the defaults do not fit:
 
 - `requiresGolden` — set to `false` for reference-free scorers (safety,
   groundedness, …). Rows without a golden answer are skipped when it is `true`.
+- `canScore(request)` — return `false` for rows that lack what the scorer
+  needs; they are recorded as skipped and left blank rather than scored 0.
+  Defaults to checking `requiresGolden`. The Source Attribution scorer, for
+  example, skips rows whose `expected_sources` cell is empty.
 - `configKeys` — the `AppConfig` keys your scorer reads. The scoring setup
   renders only the inputs belonging to the selected scorer, so a new setting
   needs a field on `AppConfig`, an input in `scoring-setup.component.html`

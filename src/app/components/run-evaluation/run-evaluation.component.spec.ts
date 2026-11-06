@@ -1387,6 +1387,43 @@ describe('RunEvaluationComponent', () => {
          expect(component.progress).toBe(100);
        }));
 
+    it('should re-score with each row\'s trace and expected sources',
+       fakeAsync(() => {
+         const fixture = TestBed.createComponent(RunEvaluationComponent);
+         const component = fixture.componentInstance;
+         fixture.detectChanges();
+
+         const trace = {
+           citedSources: [{
+             title: 'Runbook v2',
+             uri: 'https://wiki/runbook',
+             document: '',
+             dataStore: 'ops',
+             connector: 'confluence',
+           }],
+         };
+         resultsSubject.next([{
+           query: 'q1',
+           golden: 'g1',
+           fetched: 'f1',
+           ttft: 1,
+           ttfa: 2,
+           ttlt: 3,
+           scorerResults: scored(0.1),
+           trace,
+           inputColumns: {expected_sources: 'connectors:confluence'},
+         }]);
+         mockEvalService.scoreAll.and.resolveTo(scored(1));
+
+         component.openReRateModal();
+         component.startReRate();
+         tick();
+
+         const request = mockEvalService.scoreAll.calls.mostRecent().args[0];
+         expect(request.trace).toEqual(trace);
+         expect(request.expectedSources).toBe('connectors:confluence');
+       }));
+
     it('should skip scoring a row that was never fetched', fakeAsync(() => {
          const fixture = TestBed.createComponent(RunEvaluationComponent);
          const component = fixture.componentInstance;

@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import {AnswerTrace} from '../models/answer-trace.model';
 import {AppConfig} from '../models/app-config.model';
 
 /**
@@ -28,6 +29,17 @@ export interface ScoringRequest {
   golden?: string;
   /** The active application configuration. */
   config: AppConfig;
+  /**
+   * The evidence the agent cited behind the response, so a scorer can judge
+   * grounding rather than wording. Absent for rows fetched before traces
+   * were captured.
+   */
+  trace?: AnswerTrace;
+  /**
+   * The row's raw `expected_sources` cell: `;`-separated sources the agent is
+   * expected to cite. Absent or empty when the dataset sets no expectation.
+   */
+  expectedSources?: string;
 }
 
 /**
@@ -67,9 +79,9 @@ export interface ScorerRunResult {
    */
   rowError?: boolean;
   /**
-   * Whether the scorer was skipped (because it requires a golden answer and
-   * the row has none, or because the row itself is not scorable during
-   * re-rating).
+   * Whether the scorer was skipped because the row lacks what it needs, such
+   * as a golden answer or an expectation to check, or because the row itself
+   * is not scorable during re-rating.
    */
   skipped?: boolean;
 }
@@ -139,6 +151,16 @@ export abstract class Scorer {
    * @throws An `Error` with a user facing message when scoring fails.
    */
   abstract score(request: ScoringRequest): Promise<ScoreResult>;
+
+  /**
+   * Whether the row carries what this scorer needs. Rows it cannot score are
+   * recorded as skipped and left blank, rather than scored 0.
+   * @param request The row to score.
+   * @returns By default, whether a golden answer is present when required.
+   */
+  canScore(request: ScoringRequest): boolean {
+    return !this.requiresGolden || Boolean(request.golden);
+  }
 
   /**
    * Validates the scorer specific parts of the configuration.

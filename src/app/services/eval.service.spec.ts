@@ -21,6 +21,7 @@ import {ScoreResult, Scorer, ScoringRequest} from '../scoring/scorer';
 import {SCORERS} from '../scoring/scorer.registry';
 import {AUTO_RATER_SCORER_ID} from '../scoring/scorers/auto-rater.scorer';
 import {LCS_SCORER_ID} from '../scoring/scorers/lcs.scorer';
+import {SOURCE_ATTRIBUTION_SCORER_ID} from '../scoring/scorers/source-attribution.scorer';
 import {MockEvalBackendService} from '../testing/mocks';
 
 import {EvalBackendService} from './eval-backend.service';
@@ -416,6 +417,44 @@ describe('EvalService', () => {
            displayName: 'Longest Common Subsequence',
            score: 0.33,
          });
+       });
+
+    it('should score source attribution from the trace and skip rows without expected sources',
+       async () => {
+         const builtInService = setUp();
+         const request = {
+           query: 'Who owns billing?',
+           response: 'The Payments team.',
+           config: {...CONFIG, selectedScorers: [SOURCE_ATTRIBUTION_SCORER_ID]},
+           trace: {
+             citedSources: [{
+               title: 'Billing ownership',
+               uri: 'https://jira/BILL-42',
+               document: '',
+               dataStore: 'jira-prod',
+               connector: 'jira',
+             }],
+           },
+         };
+
+         const scored = await builtInService.scoreAll({
+           ...request,
+           expectedSources: 'dataStores:jira-prod;sources:Catalog'
+         });
+         const unexpected =
+             await builtInService.scoreAll({...request, expectedSources: ''});
+
+         expect(scored).toEqual([{
+           scorerId: SOURCE_ATTRIBUTION_SCORER_ID,
+           displayName: 'Source Attribution',
+           score: 0.5,
+         }]);
+         expect(unexpected).toEqual([{
+           scorerId: SOURCE_ATTRIBUTION_SCORER_ID,
+           displayName: 'Source Attribution',
+           score: 0,
+           skipped: true,
+         }]);
        });
   });
 
@@ -898,6 +937,34 @@ describe('EvalService', () => {
 
       expect(result.fetched).toBe('First part.');
       expect(result.trace?.citedSources.map(s => s.title)).toEqual(['Doc 2']);
+    });
+
+    it('should hand the trace and expected sources to the scorers', async () => {
+      const recorder = new FakeScorer('recorder', 'Recorder', async () => ({score: 1}));
+      const service = setUp([recorder]);
+      mockBackendService.callAssistSpy.and.resolveTo(new Response(JSON.stringify([{
+        answer: {
+          replies: [{
+            groundedContent: {
+              content: {text: 'answer'},
+              textGroundingMetadata: {
+                references: [{documentMetadata: {title: 'Doc', uri: 'https://d'}}],
+              },
+            },
+          }],
+        },
+      }])));
+      spyOn(service['stateService'], 'getCurrentConfig')
+          .and.returnValue({...CONFIG, selectedScorers: ['recorder']});
+
+      await service.processRow(
+          {query: 'q', golden: 'g', expected_sources: 'sources:Doc'});
+
+      expect(recorder.requests.length).toBe(1);
+      expect(recorder.requests[0].response).toBe('answer');
+      expect(recorder.requests[0].expectedSources).toBe('sources:Doc');
+      expect(recorder.requests[0].trace?.citedSources.map(s => s.title))
+          .toEqual(['Doc']);
     });
 
     it('should carry the uploaded row\'s extra columns onto the result',

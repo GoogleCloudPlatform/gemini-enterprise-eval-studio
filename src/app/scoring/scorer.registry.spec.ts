@@ -24,6 +24,7 @@ import {ScoreResult, Scorer, ScoringRequest} from './scorer';
 import {SCORERS, ScorerRegistry} from './scorer.registry';
 import {AUTO_RATER_SCORER_ID} from './scorers/auto-rater.scorer';
 import {LCS_SCORER_ID} from './scorers/lcs.scorer';
+import {SOURCE_ATTRIBUTION_SCORER_ID} from './scorers/source-attribution.scorer';
 
 /** Minimal scorer used to verify the registry stays strategy agnostic. */
 class FakeScorer extends Scorer {
@@ -52,12 +53,24 @@ describe('ScorerRegistry', () => {
       registry = TestBed.inject(ScorerRegistry);
     });
 
-    it('should register the auto rater and LCS scorer in display order', () => {
-      expect(registry.list().map(s => s.id)).toEqual([
-        AUTO_RATER_SCORER_ID,
-        LCS_SCORER_ID,
-      ]);
-    });
+    it('should register the auto rater, LCS and Source Attribution scorers in display order',
+       () => {
+         expect(registry.list().map(s => s.id)).toEqual([
+           AUTO_RATER_SCORER_ID,
+           LCS_SCORER_ID,
+           SOURCE_ATTRIBUTION_SCORER_ID,
+         ]);
+       });
+
+    it('should need no golden answer, config keys or validation for Source Attribution',
+       () => {
+         const sourceAttribution =
+             registry.find(SOURCE_ATTRIBUTION_SCORER_ID)!;
+
+         expect(sourceAttribution.requiresGolden).toBeFalse();
+         expect(sourceAttribution.configKeys).toEqual([]);
+         expect(sourceAttribution.displayName).toBe('Source Attribution');
+       });
 
     it('should default to the first registered scorer', () => {
       expect(registry.defaultId).toBe(AUTO_RATER_SCORER_ID);

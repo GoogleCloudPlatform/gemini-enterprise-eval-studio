@@ -36,6 +36,12 @@ const KNOWN_COLUMNS: ReadonlySet<string> =
     new Set(['query', 'golden', 'conversationId', 'turn']);
 
 /**
+ * The optional input column listing the sources an answer is expected to
+ * cite, read by the Source Attribution scorer.
+ */
+export const EXPECTED_SOURCES_COLUMN = 'expected_sources';
+
+/**
  * The input columns of a row other than the ones Eval Studio interprets
  * itself, such as `expected_sources`, so they can travel with the result.
  * Values that are not strings, such as the `__parsed_extra` list Papa Parse

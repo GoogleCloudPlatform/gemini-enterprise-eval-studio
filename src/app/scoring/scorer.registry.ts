@@ -19,6 +19,7 @@ import {Inject, Injectable, InjectionToken, inject} from '@angular/core';
 import {Scorer} from './scorer';
 import {AutoRaterScorer} from './scorers/auto-rater.scorer';
 import {LcsScorer} from './scorers/lcs.scorer';
+import {SourceAttributionScorer} from './scorers/source-attribution.scorer';
 
 /**
  * A non-empty list of scorers. Typed as a tuple so that registering no scorer
@@ -39,6 +40,7 @@ export const SCORERS = new InjectionToken<ScorerList>('app.scorers', {
   factory: () => [
     inject(AutoRaterScorer),
     inject(LcsScorer),
+    inject(SourceAttributionScorer),
   ],
 });
 

@@ -19,7 +19,7 @@ import {Injectable} from '@angular/core';
 import {agentIdFromResourceName} from '../models/agent.model';
 import {CitedSource, parseDocumentResource} from '../models/answer-trace.model';
 import {AppConfig} from '../models/app-config.model';
-import {CSVRow, extraColumns} from '../models/csv-row.model';
+import {CSVRow, EXPECTED_SOURCES_COLUMN, extraColumns} from '../models/csv-row.model';
 import {ResultErrorCode, ResultRow, isScorableRow} from '../models/result-row.model';
 import {RowScoreError, ScorerRunResult, ScoringRequest} from '../scoring/scorer';
 import {ScorerRegistry} from '../scoring/scorer.registry';
@@ -313,7 +313,9 @@ export class EvalService {
           query: row.query,
           response: streamState.fullText,
           golden: row.golden,
-          config
+          config,
+          trace: {citedSources: citations},
+          expectedSources: row[EXPECTED_SOURCES_COLUMN],
         });
       } else {
         console.warn('Skipping scoring for row:', {
@@ -465,9 +467,11 @@ export class EvalService {
    * The scorers run one after another rather than concurrently, so a run
    * spreads its load over time instead of firing every scorer's backend call
    * at once. A scorer that throws does not stop the others: its failure is
-   * recorded on its own entry.
+   * recorded on its own entry. A scorer that cannot score the row (see
+   * `Scorer.canScore`) is recorded as skipped without being called.
    *
-   * @param request The query, response, golden answer and active config.
+   * @param request The query, response, golden answer, answer trace, expected
+   *     sources and active config.
    * @returns One entry per configured scorer, in run order. Never empty.
    */
   async scoreAll(request: ScoringRequest): Promise<ScorerRunResult[]> {
@@ -482,7 +486,7 @@ export class EvalService {
         score: 0
       };
 
-      if (scorer.requiresGolden && !request.golden) {
+      if (!scorer.canScore(request)) {
         entry.skipped = true;
         results.push(entry);
         continue;

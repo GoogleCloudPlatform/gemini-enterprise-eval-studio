@@ -21,7 +21,7 @@ import {distinctUntilChanged, map, takeUntil} from 'rxjs/operators';
 
 import {traceCells} from '../../models/answer-trace.model';
 import {AppConfig} from '../../models/app-config.model';
-import {CSVRow, extraColumns} from '../../models/csv-row.model';
+import {CSVRow, EXPECTED_SOURCES_COLUMN, extraColumns} from '../../models/csv-row.model';
 import {ResultRow, TRACE_COLUMN_TOOLTIP, isScorableRow} from '../../models/result-row.model';
 import {scoreColumnHeader, scoreErrorColumnHeader} from '../../scoring/score-columns';
 import {Scorer, ScorerRunResult, firstScorerError} from '../../scoring/scorer';
@@ -541,7 +541,9 @@ export class RunEvaluationComponent implements OnInit, OnDestroy {
           query: row.query,
           response: row.fetched,
           golden: row.golden,
-          config
+          config,
+          trace: row.trace,
+          expectedSources: row.inputColumns?.[EXPECTED_SOURCES_COLUMN],
         });
       } else {
         console.warn('Skipping re-rate scoring for row:', {
