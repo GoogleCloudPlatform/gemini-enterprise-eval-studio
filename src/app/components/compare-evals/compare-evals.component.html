@@ -112,7 +112,14 @@
                   <div class="flex flex-col items-end gap-1">
                     <div *ngFor="let score of result.scores" class="flex items-center gap-2">
                       <span class="text-xs text-gray-400">{{ score.scorer }}</span>
-                      <span class="font-mono font-medium text-gray-900">{{ score.baselineScore ?? 'N/A' }}</span>
+                      <span class="font-mono font-medium"
+                            [ngClass]="
+                              score.baselineScore !== null || !result.baselineErrorCode
+                                ? 'text-gray-900'
+                                : result.baselineErrorCode === 'SKIPPED'
+                                  ? 'text-amber-700'
+                                  : 'text-red-600'
+                            ">{{ score.baselineScore ?? result.baselineErrorCode ?? 'N/A' }}</span>
                     </div>
                   </div>
                 </div>
@@ -131,9 +138,20 @@
                            [ngClass]="deltaClass(score.delta)">
                         {{ score.delta > 0 ? '+' : '' }}{{ score.delta }}
                       </div>
+                      <div *ngIf="score.delta === null && score.statusChange" class="flex items-center text-xs font-medium px-2 py-0.5 rounded-full"
+                           [ngClass]="statusChangeBadgeClasses[score.statusChange]">
+                        {{ statusChangeLabels[score.statusChange] }}
+                      </div>
                       <div class="flex items-center gap-2">
                         <span class="text-xs text-gray-400">{{ score.scorer }}</span>
-                        <span class="font-mono font-medium text-gray-900">{{ score.recentScore ?? 'N/A' }}</span>
+                        <span class="font-mono font-medium"
+                              [ngClass]="
+                                score.recentScore !== null || !result.recentErrorCode
+                                  ? 'text-gray-900'
+                                  : result.recentErrorCode === 'SKIPPED'
+                                    ? 'text-amber-700'
+                                    : 'text-red-600'
+                              ">{{ score.recentScore ?? result.recentErrorCode ?? 'N/A' }}</span>
                       </div>
                     </div>
                   </div>

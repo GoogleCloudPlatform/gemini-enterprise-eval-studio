@@ -15,6 +15,54 @@
  */
 
 /**
+ * Non-numeric transition or persistent state between baseline and recent when
+ * at least one side was not scored because of an error code.
+ */
+export type ScoreStatusChange =
+    |'recent_failure'
+    |'recent_skip'
+    |'persistent_failure'
+    |'persistent_skip'
+    |'recovered';
+
+/**
+ * Display labels for each non-numeric status change in the Delta column and
+ * comparison cards.
+ */
+export const SCORE_STATUS_LABELS: Readonly<Record<ScoreStatusChange, string>> =
+    {
+      recent_failure: 'Recent Failure',
+      recent_skip: 'Recent Skip',
+      persistent_failure: 'Persistent Failure',
+      persistent_skip: 'Persistent Skip',
+      recovered: 'Recovered',
+    };
+
+/**
+ * Badge CSS classes for each `ScoreStatusChange` in the Side-by-Side
+ * comparison cards.
+ */
+export const STATUS_CHANGE_BADGE_CLASSES:
+    Readonly<Record<ScoreStatusChange, string>> = {
+      recent_failure: 'bg-red-100 text-red-700',
+      recent_skip: 'bg-red-100 text-red-700',
+      persistent_failure: 'bg-red-100 text-red-700',
+      persistent_skip: 'bg-amber-100 text-amber-700',
+      recovered: 'bg-green-100 text-green-700',
+    };
+
+/**
+ * Badge CSS classes keyed by the display label stored in `delta_*` table cells.
+ */
+export const DELTA_LABEL_BADGE_CLASSES: Readonly<Record<string, string>> = {
+  [SCORE_STATUS_LABELS.recent_failure]: 'bg-red-100 text-red-800',
+  [SCORE_STATUS_LABELS.recent_skip]: 'bg-red-100 text-red-800',
+  [SCORE_STATUS_LABELS.persistent_failure]: 'bg-red-100 text-red-800',
+  [SCORE_STATUS_LABELS.persistent_skip]: 'bg-amber-100 text-amber-800',
+  [SCORE_STATUS_LABELS.recovered]: 'bg-green-100 text-green-800',
+};
+
+/**
  * How one scorer's score moved between the two evaluations of a query.
  */
 export interface ScoreComparison {
@@ -26,6 +74,11 @@ export interface ScoreComparison {
   recentScore: number|null;
   /** Recent minus baseline, or null when either score is missing. */
   delta: number|null;
+  /**
+   * Transition or persistent status when at least one evaluation was not
+   * scored because of an error code.
+   */
+  statusChange?: ScoreStatusChange;
 }
 
 /**
@@ -37,4 +90,8 @@ export interface ComparisonResult {
   scores: ScoreComparison[];
   baselineResponse?: string;
   recentResponse?: string;
+  /** Error code from the baseline evaluation, when present. */
+  baselineErrorCode?: string;
+  /** Error code from the recent evaluation, when present. */
+  recentErrorCode?: string;
 }

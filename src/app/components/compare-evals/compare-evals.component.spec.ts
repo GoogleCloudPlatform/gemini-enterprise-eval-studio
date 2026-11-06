@@ -127,6 +127,242 @@ describe('CompareEvalsComponent', () => {
     expect(component.displayResults[0]['delta_0']).toBe('');
   });
 
+  it('should surface Error Code and status transitions when an evaluation row was not scored due to an error',
+     () => {
+       upload('baseline', [
+         {
+           'Query': 'q-errored',
+           'Fetched': 'ok',
+           'Error Code': '',
+           'A Score': '0.9',
+         },
+         {
+           'Query': 'q-skipped',
+           'Fetched': 'ok',
+           'Error Code': '',
+           'A Score': '0.8',
+         },
+         {
+           'Query': 'q-recovered',
+           'Fetched': 'FAILED: Assist operation failed.',
+           'Error Code': 'FAILED',
+           'A Score': '',
+         },
+         {
+           'Query': 'q-both-errored',
+           'Fetched': 'FAILED: Assist operation failed.',
+           'Error Code': 'FAILED',
+           'A Score': '',
+         },
+         {
+           'Query': 'q-both-skipped',
+           'Fetched': 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           'Error Code': 'SKIPPED',
+           'A Score': '',
+         },
+         {
+           'Query': 'q-skip-to-fail',
+           'Fetched': 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           'Error Code': 'SKIPPED',
+           'A Score': '',
+         },
+         {
+           'Query': 'q-fail-to-skip',
+           'Fetched': 'FAILED: Assist operation failed.',
+           'Error Code': 'FAILED',
+           'A Score': '',
+         },
+       ]);
+       upload('recent', [
+         {
+           'Query': 'q-errored',
+           'Fetched': 'FAILED: Assist operation failed.',
+           'Error Code': 'FAILED',
+           'A Score': '',
+         },
+         {
+           'Query': 'q-skipped',
+           'Fetched': 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           'Error Code': 'SKIPPED',
+           'A Score': '',
+         },
+         {
+           'Query': 'q-recovered',
+           'Fetched': 'fixed',
+           'Error Code': '',
+           'A Score': '0.85',
+         },
+         {
+           'Query': 'q-both-errored',
+           'Fetched': 'Error: timeout',
+           'Error Code': 'ERROR',
+           'A Score': '',
+         },
+         {
+           'Query': 'q-both-skipped',
+           'Fetched': 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           'Error Code': 'SKIPPED',
+           'A Score': '',
+         },
+         {
+           'Query': 'q-skip-to-fail',
+           'Fetched': 'FAILED: Assist operation failed.',
+           'Error Code': 'FAILED',
+           'A Score': '',
+         },
+         {
+           'Query': 'q-fail-to-skip',
+           'Fetched': 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           'Error Code': 'SKIPPED',
+           'A Score': '',
+         },
+       ]);
+
+       component.compareEvals();
+
+       expect(component.comparisonResults).toEqual([
+         {
+           query: 'q-errored',
+           scores: [{
+             scorer: 'A',
+             baselineScore: 0.9,
+             recentScore: null,
+             delta: null,
+             statusChange: 'recent_failure',
+           }],
+           baselineResponse: 'ok',
+           recentResponse: 'FAILED: Assist operation failed.',
+           recentErrorCode: 'FAILED',
+         },
+         {
+           query: 'q-skipped',
+           scores: [{
+             scorer: 'A',
+             baselineScore: 0.8,
+             recentScore: null,
+             delta: null,
+             statusChange: 'recent_skip',
+           }],
+           baselineResponse: 'ok',
+           recentResponse: 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           recentErrorCode: 'SKIPPED',
+         },
+         {
+           query: 'q-recovered',
+           scores: [{
+             scorer: 'A',
+             baselineScore: null,
+             recentScore: 0.85,
+             delta: null,
+             statusChange: 'recovered',
+           }],
+           baselineResponse: 'FAILED: Assist operation failed.',
+           recentResponse: 'fixed',
+           baselineErrorCode: 'FAILED',
+         },
+         {
+           query: 'q-both-errored',
+           scores: [{
+             scorer: 'A',
+             baselineScore: null,
+             recentScore: null,
+             delta: null,
+             statusChange: 'persistent_failure',
+           }],
+           baselineResponse: 'FAILED: Assist operation failed.',
+           recentResponse: 'Error: timeout',
+           baselineErrorCode: 'FAILED',
+           recentErrorCode: 'ERROR',
+         },
+         {
+           query: 'q-both-skipped',
+           scores: [{
+             scorer: 'A',
+             baselineScore: null,
+             recentScore: null,
+             delta: null,
+             statusChange: 'persistent_skip',
+           }],
+           baselineResponse: 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           recentResponse: 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           baselineErrorCode: 'SKIPPED',
+           recentErrorCode: 'SKIPPED',
+         },
+         {
+           query: 'q-skip-to-fail',
+           scores: [{
+             scorer: 'A',
+             baselineScore: null,
+             recentScore: null,
+             delta: null,
+             statusChange: 'recent_failure',
+           }],
+           baselineResponse: 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           recentResponse: 'FAILED: Assist operation failed.',
+           baselineErrorCode: 'SKIPPED',
+           recentErrorCode: 'FAILED',
+         },
+         {
+           query: 'q-fail-to-skip',
+           scores: [{
+             scorer: 'A',
+             baselineScore: null,
+             recentScore: null,
+             delta: null,
+             statusChange: 'recent_skip',
+           }],
+           baselineResponse: 'FAILED: Assist operation failed.',
+           recentResponse: 'SKIPPED: NON_ASSIST_SEEKING_QUERY_IGNORED',
+           baselineErrorCode: 'FAILED',
+           recentErrorCode: 'SKIPPED',
+         },
+       ]);
+       expect(component.displayResults).toEqual([
+         {
+           query: 'q-errored',
+           baseline_0: 0.9,
+           recent_0: 'FAILED',
+           delta_0: 'Recent Failure',
+         },
+         {
+           query: 'q-skipped',
+           baseline_0: 0.8,
+           recent_0: 'SKIPPED',
+           delta_0: 'Recent Skip',
+         },
+         {
+           query: 'q-recovered',
+           baseline_0: 'FAILED',
+           recent_0: 0.85,
+           delta_0: 'Recovered',
+         },
+         {
+           query: 'q-both-errored',
+           baseline_0: 'FAILED',
+           recent_0: 'ERROR',
+           delta_0: 'Persistent Failure',
+         },
+         {
+           query: 'q-both-skipped',
+           baseline_0: 'SKIPPED',
+           recent_0: 'SKIPPED',
+           delta_0: 'Persistent Skip',
+         },
+         {
+           query: 'q-skip-to-fail',
+           baseline_0: 'SKIPPED',
+           recent_0: 'FAILED',
+           delta_0: 'Recent Failure',
+         },
+         {
+           query: 'q-fail-to-skip',
+           baseline_0: 'FAILED',
+           recent_0: 'SKIPPED',
+           delta_0: 'Recent Skip',
+         },
+       ]);
+     });
+
   it('should report when the CSVs share no scoring method', () => {
     upload('baseline', [{'Query': 'q', 'Fetched': 'f', 'A Score': '0.5'}]);
     upload('recent', [{'Query': 'q', 'Fetched': 'f', 'B Score': '0.5'}]);

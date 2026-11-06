@@ -130,19 +130,27 @@
 
             <!-- Delta Type -->
             <div *ngIf="col.type === 'delta'" class="font-medium">
-              <span [ngClass]="deltaClass(row[col.key])">
-                {{ row[col.key] > 0 ? "+" : "" }}{{ row[col.key] }}
-              </span>
-              <span
-                *ngIf="row[col.key] > 0.1"
-                class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
-                >Improvement</span
-              >
-              <span
-                *ngIf="row[col.key] < -0.1"
-                class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
-                >Regression</span
-              >
+              <ng-container *ngIf="deltaLabelBadgeClasses[row[col.key]]; else numericDelta">
+                <span
+                  class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                  [ngClass]="deltaLabelBadgeClasses[row[col.key]]"
+                >{{ row[col.key] }}</span>
+              </ng-container>
+              <ng-template #numericDelta>
+                <span [ngClass]="deltaClass(row[col.key])">
+                  {{ row[col.key] > 0 ? "+" : "" }}{{ row[col.key] }}
+                </span>
+                <span
+                  *ngIf="row[col.key] > 0.1"
+                  class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800"
+                  >Improvement</span
+                >
+                <span
+                  *ngIf="row[col.key] < -0.1"
+                  class="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800"
+                  >Regression</span
+                >
+              </ng-template>
             </div>
           </td>
         </tr>

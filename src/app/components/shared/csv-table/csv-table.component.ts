@@ -17,6 +17,7 @@
 import {CommonModule, formatDate} from '@angular/common';
 import {Component, Input, OnChanges} from '@angular/core';
 
+import {DELTA_LABEL_BADGE_CLASSES} from '../../../models/comparison-result.model';
 import {CsvService} from '../../../services/csv.service';
 import {InfoTooltipComponent} from '../info-tooltip/info-tooltip.component';
 
@@ -69,6 +70,7 @@ export class CsvTableComponent implements OnChanges {
   @Input() rowWarningValues: string[] = [];
 
   hasTruncated = false;
+  readonly deltaLabelBadgeClasses = DELTA_LABEL_BADGE_CLASSES;
 
   constructor(private csvService: CsvService) {}
 

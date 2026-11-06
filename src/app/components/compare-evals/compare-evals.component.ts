@@ -18,7 +18,7 @@ import {CommonModule} from '@angular/common';
 import {ChangeDetectorRef, Component} from '@angular/core';
 import {FormsModule} from '@angular/forms';
 
-import {ComparisonResult, ScoreComparison} from '../../models/comparison-result.model';
+import {ComparisonResult, SCORE_STATUS_LABELS, STATUS_CHANGE_BADGE_CLASSES, ScoreComparison, ScoreStatusChange} from '../../models/comparison-result.model';
 import {ScoreColumn, findScoreColumns, scoreColumnHeader} from '../../scoring/score-columns';
 import {CsvService} from '../../services/csv.service';
 import {CsvTableComponent, ColumnDef} from '../shared/csv-table/csv-table.component';
@@ -71,6 +71,9 @@ export class CompareEvalsComponent {
    * baseline, recent and delta column per scorer.
    */
   displayResults: Array<Record<string, unknown>> = [];
+
+  readonly statusChangeLabels = SCORE_STATUS_LABELS;
+  readonly statusChangeBadgeClasses = STATUS_CHANGE_BADGE_CLASSES;
 
   constructor(private csvService: CsvService, private cdr: ChangeDetectorRef) {}
 
@@ -276,13 +279,32 @@ export class CompareEvalsComponent {
     this.baselineRows.forEach(baseRow => {
       const recentRow = recentMap.get(baseRow['query']);
       if (recentRow) {
+        const baselineErrorCode =
+            (baseRow['error code'] || baseRow['errorcode'] || '').trim() ||
+            undefined;
+        const recentErrorCode =
+            (recentRow['error code'] || recentRow['errorcode'] || '').trim() ||
+            undefined;
+
         const scores = scorers.map((shared): ScoreComparison => {
           const baselineScore = parseScore(baseRow[shared.baselineKey]);
           const recentScore = parseScore(recentRow[shared.recentKey]);
           const delta = baselineScore === null || recentScore === null ?
               null :
               Number((recentScore - baselineScore).toFixed(2));
-          return {scorer: shared.scorer, baselineScore, recentScore, delta};
+          const statusChange = resolveStatusChange({
+            baselineScore,
+            recentScore,
+            baselineErrorCode,
+            recentErrorCode,
+          });
+          return {
+            scorer: shared.scorer,
+            baselineScore,
+            recentScore,
+            delta,
+            ...(statusChange ? {statusChange} : {}),
+          };
         });
 
         const baselineResponse = baseRow['fetched'] || baseRow['fetchedresponse'] || 'N/A';
@@ -292,7 +314,9 @@ export class CompareEvalsComponent {
           query: baseRow['query'],
           scores,
           baselineResponse,
-          recentResponse
+          recentResponse,
+          ...(baselineErrorCode ? {baselineErrorCode} : {}),
+          ...(recentErrorCode ? {recentErrorCode} : {}),
         });
       }
     });
@@ -300,9 +324,12 @@ export class CompareEvalsComponent {
     this.displayResults = this.comparisonResults.map(result => {
       const flat: Record<string, unknown> = {query: result.query};
       result.scores.forEach((score, i) => {
-        flat[baselineScoreKey(i)] = score.baselineScore ?? '';
-        flat[recentScoreKey(i)] = score.recentScore ?? '';
-        flat[deltaKey(i)] = score.delta ?? '';
+        flat[baselineScoreKey(i)] =
+            score.baselineScore ?? result.baselineErrorCode ?? '';
+        flat[recentScoreKey(i)] =
+            score.recentScore ?? result.recentErrorCode ?? '';
+        flat[deltaKey(i)] =
+            score.delta ?? statusChangeLabel(score.statusChange) ?? '';
       });
       return flat;
     });
@@ -332,6 +359,49 @@ export class CompareEvalsComponent {
     // Any number left is within -0.1 to 0.1; NaN gets no color.
     return isNaN(delta) ? '' : 'bg-gray-100 text-gray-600';
   }
+}
+
+/** Inputs for resolving a non-numeric status change between two runs. */
+interface StatusChangeParams {
+  baselineScore: number|null;
+  recentScore: number|null;
+  baselineErrorCode?: string;
+  recentErrorCode?: string;
+}
+
+/**
+ * Determines the non-numeric status transition or persistent error/skip state
+ * when at least one evaluation had an error code.
+ */
+function resolveStatusChange({
+  baselineScore,
+  recentScore,
+  baselineErrorCode,
+  recentErrorCode,
+}: StatusChangeParams): ScoreStatusChange|undefined {
+  if (baselineScore !== null && recentScore === null && recentErrorCode) {
+    return recentErrorCode === 'SKIPPED' ? 'recent_skip' : 'recent_failure';
+  }
+  if (baselineScore === null && baselineErrorCode && recentScore !== null) {
+    return 'recovered';
+  }
+  if (baselineScore === null && recentScore === null && baselineErrorCode &&
+      recentErrorCode) {
+    if (baselineErrorCode === 'SKIPPED' && recentErrorCode === 'SKIPPED') {
+      return 'persistent_skip';
+    }
+    if (baselineErrorCode !== 'SKIPPED' && recentErrorCode !== 'SKIPPED') {
+      return 'persistent_failure';
+    }
+    return recentErrorCode === 'SKIPPED' ? 'recent_skip' : 'recent_failure';
+  }
+  return undefined;
+}
+
+/** Returns the display label for a status transition in the Delta column. */
+function statusChangeLabel(
+    statusChange: ScoreStatusChange|undefined): string|undefined {
+  return statusChange ? SCORE_STATUS_LABELS[statusChange] : undefined;
 }
 
 /** Strips the whitespace and byte order mark a CSV header may carry. */
